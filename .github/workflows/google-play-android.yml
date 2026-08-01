@@ -1,0 +1,246 @@
+name: 🤖 Build Android — notictahiro
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ✅ package-lock.json موجود — npm ci أسرع وأكثر حتمية من npm install
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # FIX: حذفنا --ignore-scripts من npm ci لأنه يمنع sharp من تنزيل بيناراتها
+      # (sharp تحتاج postinstall لتنزيل sharp-linux-x64.node من GitHub releases)
+      # npm ci بدون --ignore-scripts يُشغّل جميع lifecycle scripts بشكل آمن.
+      # تثبيت التبعيات: نحاول npm ci (سريع) لكن إن كان package-lock.json
+      # قديماً (مكتبة جديدة أُضيفت لـ package.json ولم تُحدَّث في الـ lock)،
+      # npm ci يفشل → نسقط لـ npm install الذي يُحدّث الـ lock ويثبّت الجديد.
+      # هذا حاسم: المكتبات الأصلية (text-to-speech, file-picker) يجب أن
+      # تُثبَّت فعلياً وإلا لن تعمل في الـ APK رغم وجودها في الكود.
+      - name: Install dependencies
+        run: |
+          npm ci --no-audit --no-fund || {
+            echo "⚠️ npm ci فشل (lock قديم) → npm install لتحديثه وتثبيت الجديد"
+            npm install --no-audit --no-fund
+          }
+          echo "✅ التبعيات مثبّتة"
+
+      # ✅ CAPACITOR_BUILD=1 لتجنب vite-plugin-singlefile
+      # ✅ حقن إعدادات Supabase من GitHub Secrets (حرج — بدونها الذكاء الاصطناعي لا يعمل)
+      - name: Verify Supabase secrets
+        run: |
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+            echo "::warning::VITE_SUPABASE_URL غير موجود في GitHub Secrets — الذكاء الاصطناعي لن يعمل في هذا الـ APK!"
+            echo "::warning::شغّل ./scripts/push-to-github.sh محلياً لرفع الـ secrets"
+          else
+            echo "✅ VITE_SUPABASE_URL موجود"
+          fi
+
+      - name: Build web
+        run: CAPACITOR_BUILD=1 npx vite build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_TOKEN: ${{ secrets.VITE_APP_TOKEN }}
+
+      # ✅ Java 21 مطلوب لـ Capacitor 8
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Add & sync Android
+        run: |
+          npx cap add android || true
+          npx cap sync android
+
+      # ✅ توليد الأيقونات التكيّفية + شاشة البداية لكل كثافات الأجهزة
+      #
+      # FIX نهائي (بدون sharp تماماً):
+      # الأيقونات مُولَّدة مسبقاً بـ Python/Pillow وموجودة في android-patches/res/
+      # → سكريبت apply-icons.sh ينسخها للمجلد الصحيح بعد cap sync
+      # → لا حاجة لـ sharp أو @capacitor/assets أبداً — البناء لن يفشل مرة أخرى!
+      # ✅ حارس: تأكّد أن إضافة AdMob ثبّتت فعلاً وسُجّلت في مشروع أندرويد.
+      # القفل (package-lock.json) كان ناقصاً عدة حزم، فيسقط البناء إلى
+      # npm install — وإن فشل ذلك بصمت يخرج APK بلا إعلانات إطلاقاً.
+      # نفشل البناء بصوت عالٍ بدل شحن نسخة معطوبة.
+      - name: Verify AdMob plugin is installed & registered
+        run: |
+          if [ ! -d "node_modules/@capacitor-community/admob" ]; then
+            echo "❌ إضافة AdMob غير مثبّتة في node_modules"; exit 1
+          fi
+          PV=$(node -p "require('./node_modules/@capacitor-community/admob/package.json').version")
+          echo "✅ إضافة AdMob مثبّتة — نسخة $PV"
+          if grep -rq "capacitor-community/admob" android/capacitor.settings.gradle android/app/capacitor.build.gradle 2>/dev/null; then
+            echo "✅ الإضافة مُسجّلة في مشروع أندرويد"
+          else
+            echo "❌ الإضافة غير مُسجّلة في Gradle — cap sync لم يلتقطها"
+            echo "── capacitor.settings.gradle ──"; cat android/capacitor.settings.gradle 2>/dev/null
+            exit 1
+          fi
+
+      - name: Copy pre-built icons & splash to Android (no sharp needed)
+        run: bash android-patches/apply-icons.sh
+
+      - name: Apply AdMob App ID to AndroidManifest
+        run: bash android-patches/apply-admob.sh
+
+      # ✅ امتثال Google Play: من 31 غشت 2026 كل تحديث يجب أن يستهدف
+      # Android 16 (API 36) وإلا يُرفض في Play Console. Capacitor 8 يولّد
+      # 36 افتراضياً، لكن نفرضه صراحةً ونتحقق منه حتى لا ينكسر الامتثال
+      # بصمت لو تغيّر القالب أو رجعنا لإصدار أقدم من Capacitor.
+      - name: Enforce Google Play target API 36
+        run: |
+          VG=android/variables.gradle
+          sed -i -E 's/(minSdkVersion[[:space:]]*=?[[:space:]]*)[0-9]+/\124/'        "$VG"
+          sed -i -E 's/(compileSdkVersion[[:space:]]*=?[[:space:]]*)[0-9]+/\136/'    "$VG"
+          sed -i -E 's/(targetSdkVersion[[:space:]]*=?[[:space:]]*)[0-9]+/\136/'     "$VG"
+          echo "── variables.gradle ──"; cat "$VG"
+          TARGET=$(grep -oE 'targetSdkVersion[[:space:]]*=?[[:space:]]*[0-9]+' "$VG" | grep -oE '[0-9]+$')
+          if [ "$TARGET" != "36" ]; then
+            echo "❌ targetSdkVersion=$TARGET — يجب أن يكون 36 (متطلب Play من 31/08/2026)"; exit 1
+          fi
+          echo "✅ targetSdkVersion=36 — مطابق لمتطلب Google Play"
+
+      # ✅ FIX حرج: WebView له طبقة إذن داخلية منفصلة عن إذن النظام —
+      # بدون هذا، يفشل الإدخال الصوتي (getUserMedia/SpeechRecognition)
+      # بصمت حتى مع موافقة المستخدم على RECORD_AUDIO.
+      - name: Fix microphone permission inside WebView
+        run: bash android-patches/apply-mic-permission.sh
+
+      # ✅ ميزة الفقعة العائمة (تطفو فوق كل التطبيقات): إذن خاص +
+      # خدمة Foreground + Plugin مخصص. يُعيد كتابة MainActivity.java
+      # بنسخة شاملة (ميكروفون + فقعة معاً) — لذا يُشغَّل بعد السطر أعلاه.
+      - name: Apply floating bubble overlay feature
+        run: bash android-patches/apply-bubble-overlay.sh
+
+      # ✅ Firebase الأصلي (google-services.json + Analytics SDK)
+      # لا يتعارض مع MainActivity.java — فقط ملفات gradle + json
+      - name: Apply native Firebase config
+        run: bash android-patches/apply-firebase.sh
+
+      # ✅ محرك النطق الأصلي (queries لـ TTS في Manifest)
+      - name: Apply native TTS config
+        run: bash android-patches/apply-tts.sh
+
+      # ✅ اسم التطبيق الظاهر عند التثبيت (Notic Tahiro Ai)
+      - name: Apply app name
+        run: bash android-patches/apply-app-name.sh
+
+      # ✅ versionCode تلقائي — كل build له رقم أعلى (متطلب Play Store الصارم)
+      - name: Auto-increment versionCode
+        run: |
+          VERSION_CODE=$(( ${{ github.run_number }} + 100 ))
+          VERSION_NAME="1.0.${{ github.run_number }}"
+          sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
+          echo "📦 versionCode=$VERSION_CODE versionName=$VERSION_NAME"
+          grep -E "versionCode|versionName" android/app/build.gradle | head -2
+
+      - name: Decode keystore
+        run: |
+          # المصدر 1: GitHub Secret (الأولوية — للنشر التلقائي)
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+            echo "✅ keystore من GitHub Secrets"
+          # المصدر 2: ملف upload-key.keystore.b64 داخل المشروع (للطوارئ)
+          elif [ -f "upload-key.keystore.b64" ]; then
+            base64 --decode upload-key.keystore.b64 > android/app/release.keystore
+            echo "✅ keystore من ملف .b64 المحلي"
+          else
+            echo "::error::❌ لا يوجد keystore! أضف ANDROID_KEYSTORE_BASE64 لـ Secrets أو upload-key.keystore.b64 للمشروع"
+            exit 1
+          fi
+          SIZE=$(stat -c%s android/app/release.keystore)
+          if [ "$SIZE" -lt 1000 ]; then
+            echo "::error::release.keystore حجمه ${SIZE} bytes — تالف!"
+            exit 1
+          fi
+          echo "✅ keystore سليم (${SIZE} bytes)"
+
+          # ── تحقّق من بصمة التوقيع (SHA1) لضمان ثبات المفتاح عبر التحديثات ──
+          # نطبع البصمة في كل بناء. إن ضبطت EXPECTED_KEYSTORE_SHA1 كـ Secret،
+          # يرفض البناء عند أي اختلاف — حماية من رفع AAB بتوقيع خاطئ يكسر التحديث.
+          if [ -n "${{ secrets.ANDROID_KEY_ALIAS }}" ] && [ -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            ACTUAL_SHA1=$(keytool -list -v \
+              -keystore android/app/release.keystore \
+              -alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+              -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" 2>/dev/null \
+              | grep -i "SHA1:" | head -1 | sed 's/.*SHA1: //' | tr -d ' ')
+            echo "🔑 بصمة التوقيع SHA1: ${ACTUAL_SHA1}"
+            echo "ℹ️ احفظ هذه البصمة — يجب أن تبقى ثابتة في كل تحديث."
+
+            EXPECTED="${{ secrets.EXPECTED_KEYSTORE_SHA1 }}"
+            if [ -n "$EXPECTED" ]; then
+              EXP_CLEAN=$(echo "$EXPECTED" | tr -d ' :' | tr '[:lower:]' '[:upper:]')
+              ACT_CLEAN=$(echo "$ACTUAL_SHA1" | tr -d ' :' | tr '[:lower:]' '[:upper:]')
+              if [ "$EXP_CLEAN" != "$ACT_CLEAN" ]; then
+                echo "::error::❌ بصمة التوقيع تغيّرت! المتوقّع=${EXPECTED} الفعلي=${ACTUAL_SHA1}"
+                echo "::error::هذا keystore مختلف — رفعه سيكسر تحديثات Play Store. أوقفنا البناء للحماية."
+                exit 1
+              fi
+              echo "✅ بصمة التوقيع مطابقة — التوقيع ثابت وآمن للتحديث"
+            else
+              echo "💡 نصيحة: أضف Secret باسم EXPECTED_KEYSTORE_SHA1 بقيمة البصمة أعلاه"
+              echo "   لتفعيل الحماية التلقائية ضد تغيّر التوقيع في التحديثات القادمة."
+            fi
+          fi
+
+      # ── 1. Debug APK (للتجربة) ───────────────────────────
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      # ── 2. Release APK (موقّع) ───────────────────────────
+      - name: Build release APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=$PWD/app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            --no-daemon
+
+      # ── 3. Release AAB (للـ Play Store) ─────────────────
+      - name: Build release AAB
+        working-directory: android
+        run: |
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=$PWD/app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            --no-daemon
+
+      # ── رفع الملفات الثلاثة ──────────────────────────────
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: notictahiro-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: notictahiro-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: notictahiro-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab

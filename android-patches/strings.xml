@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  android/app/src/main/res/values/strings.xml
+  اسم التطبيق الذي يظهر في المتجر وتحت الأيقونة
+-->
+<resources>
+    <string name="app_name">Notic Tahiro</string>
+    <string name="title_activity_main">Notic Tahiro</string>
+    <string name="package_name">com.notictahiro.app</string>
+    <string name="custom_url_scheme">com.notictahiro.app</string>
+</resources>

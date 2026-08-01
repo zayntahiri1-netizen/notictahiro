@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Notic Tahiro — مساعدك الذكي للإنتاجية</title>
+    <meta name="description" content="Notic Tahiro - مفكرة ذكية مدعومة بالذكاء الاصطناعي لإدارة ملاحظاتك، أفكارك، مهامك، وشؤونك المالية" />
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f0320" media="(prefers-color-scheme: dark)" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" sizes="32x32" href="/icons/favicon-32.png" type="image/png" />
+    <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
+
+    <!--
+      Apple Touch Icons — يجب أن تكون PNG معتمة (بدون شفافية).
+      FIX حرج: iOS لا يدعم الشفافية على الشاشة الرئيسية ويحوّل أي منطقة
+      شفافة إلى أسود. لذا نستخدم أيقونات apple-touch-icon المعتمة المخصّصة
+      (خلفية متدرّجة + الشعار) بدلاً من icon-512 الشفافة التي كانت ستظهر
+      بإطار أسود قبيح على أجهزة Apple.
+    -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/apple-touch-icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="76x76"   href="/icons/apple-touch-icon-152.png" />
+
+    <!-- Apple PWA meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Notic Tahiro" />
+
+    <!-- Microsoft Tiles (Windows Phone / Edge PWA) -->
+    <meta name="msapplication-TileColor" content="#7c3aed" />
+    <meta name="msapplication-TileImage" content="/icons/apple-touch-icon-152.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Notic Tahiro" />
+    <meta property="og:description" content="مفكرة ذكية مدعومة بالذكاء الاصطناعي" />
+    <meta property="og:image" content="/icons/social-512.png" />
+    <meta property="og:type" content="website" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Notic Tahiro" />
+    <meta name="twitter:description" content="مفكرة ذكية مدعومة بالذكاء الاصطناعي" />
+    <meta name="twitter:image" content="/icons/social-512.png" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://oispxxmxltkmkcmoqxmy.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Permissions-Policy: only microphone for same origin (voice input) -->
+    <meta http-equiv="Permissions-Policy" content="microphone=(self)" />
+  </head>
+  <body class="antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

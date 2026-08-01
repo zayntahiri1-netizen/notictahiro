@@ -1,0 +1,340 @@
+@import "tailwindcss";
+
+/* أنماط مخصصة لتطبيق Notic */
+@layer base {
+  :root {
+    --color-primary: #8B5CF6;
+    --color-secondary: #6366F1;
+
+    /* ── مناطق الأمان للأجهزة ذات الحواف/النوتش/مؤشر الـ Home ── */
+    /* تعمل على iPhone X+، أجهزة Android بثقب الكاميرا، واللوحات بحواف مستديرة */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+
+    /* ── حجم خط متجاوب مع عرض الشاشة (هاتف صغير → لوحة كبيرة) ── */
+    /* يضمن قراءة مريحة من 320px حتى 2560px بدون قص أو تمدد مفرط */
+    font-size: clamp(15px, 0.9rem + 0.15vw, 18px);
+  }
+
+  html {
+    font-family: 'Inter', 'Noto Kufi Arabic', system-ui, sans-serif;
+    /* منع تكبير النص التلقائي على iOS عند الدوران */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+    /* منع نطّ الصفحة المطّاطي على iOS داخل WebView */
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    /* احترام منطقة الأمان على المستوى الجذري */
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+  }
+
+  /* العنصر الجذر يملأ المساحة المتاحة بعد حسم مناطق الأمان */
+  #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  /* ── منع التكبير عند التركيز على الحقول في iOS (الخط ≥ 16px) ── */
+  /* iOS يكبّر الصفحة تلقائياً إن كان خط الحقل أصغر من 16px */
+  @supports (-webkit-touch-callout: none) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+  /* ── حجز مساحة البانر الإعلاني في النوافذ المنبثقة ──
+     البانر طبقة أصلية تطفو فوق الصفحة، فأي شريط سفلي داخل نافذة
+     position:fixed يجب أن يحجز ارتفاعه صراحةً وإلا غطّاه الإعلان. */
+  .pb-banner {
+    padding-bottom: calc(var(--banner-h, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-banner {
+    bottom: calc(var(--banner-h, 0px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ── محرر النص العادي (contenteditable) — بديل textarea ── */
+  .plain-editable {
+    white-space: pre-wrap;      /* عرض \n كأسطر */
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    -webkit-user-modify: read-write-plaintext-only;
+    caret-color: var(--color-primary);
+    cursor: text;
+  }
+  .plain-editable:empty::before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+  }
+  .dark .plain-editable:empty::before { color: #4b5563; }
+
+@layer utilities {
+  /* تأثير التلاشي للأعلى */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* تأثير الانبثاق الفاخر (iOS/macOS Style) */
+  .animate-scale-in {
+    animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes scaleIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.92) translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* تأثيرات الزجاج الفاخر (Ultra Premium Glassmorphism) */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .glass-card {
+    background: rgba(17, 24, 39, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 1px 5px rgba(255, 255, 255, 0.05);
+  }
+
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; backdrop-filter: blur(0px); }
+    to { opacity: 1; backdrop-filter: blur(12px); }
+  }
+
+  /* شريط الأزرار المتحرك من اليمين إلى اليسار */
+  .animate-actions-rtl {
+    animation: actionsRtl 11s linear infinite;
+    will-change: transform;
+  }
+
+  .animate-actions-rtl:hover,
+  .animate-actions-rtl:focus-within {
+    animation-play-state: paused;
+  }
+
+  @keyframes actionsRtl {
+    0% {
+      transform: translateX(28%);
+    }
+    100% {
+      transform: translateX(-28%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-actions-rtl {
+      animation: none;
+      transform: none;
+    }
+  }
+  
+  /* تأثير النبض */
+  .animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* تمرير مخصص */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4B5563;
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6B7280;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* شريط أدوات قابل للسحب مع هوامش تمنع قص الأزرار عند الأطراف */
+  .action-scroller {
+    scroll-padding-inline: 1.25rem;
+  }
+
+  .action-scroller > div {
+    padding-inline: 1.25rem;
+  }
+
+  .action-scroller button {
+    flex-shrink: 0;
+    scroll-snap-align: center;
+  }
+
+  /* تحسينات دقيقة للشاشات الصغيرة جداً */
+  @media (max-width: 380px) {
+    .action-scroller > div {
+      gap: 0.35rem;
+      padding-inline: 0.75rem;
+    }
+
+    .action-scroller button {
+      min-width: 2.55rem;
+      min-height: 2.55rem;
+      padding: 0.65rem;
+    }
+  }
+
+  @media (max-height: 620px) and (orientation: landscape) {
+    .compact-landscape {
+      padding-top: 0.4rem !important;
+      padding-bottom: 0.4rem !important;
+    }
+  }
+  
+  /* تأثير الزجاج */
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  /* خط النص المتقطع */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     استجابة شاملة لكل أحجام الأجهزة (هاتف صغير → لوحة كبيرة)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* أدوات مساعدة لمناطق الأمان — تُستخدم في الهيدر/الفوتر/النوافذ */
+  .safe-top    { padding-top: var(--safe-top); }
+  .safe-bottom { padding-bottom: var(--safe-bottom); }
+  .safe-x      { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+  .safe-all {
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+  }
+
+  /* النوافذ المنبثقة (modals) — تحترم مناطق الأمان ولا تُقصّ على الأجهزة ذات النوتش */
+  .modal-backdrop {
+    padding-top: max(1rem, var(--safe-top));
+    padding-bottom: max(1rem, var(--safe-bottom));
+    padding-left: max(1rem, var(--safe-left));
+    padding-right: max(1rem, var(--safe-right));
+  }
+
+  /* ── الهواتف الصغيرة جداً (≤ 360px مثل iPhone SE / Galaxy A القديمة) ── */
+  @media (max-width: 360px) {
+    :root { font-size: 14px; }
+    .glass-card { border-radius: 1.25rem; }
+  }
+
+  /* ── اللوحات الكبيرة والشاشات العريضة: حدّ أقصى للمحتوى لتجنب التمدد المفرط ── */
+  @media (min-width: 1536px) {
+    .content-max {
+      max-width: 1400px;
+      margin-inline: auto;
+    }
+  }
+
+  /* ── الشاشات الضخمة (≥ 2000px مثل اللوحات الكبيرة جداً والشاشات الخارجية) ── */
+  @media (min-width: 2000px) {
+    :root { font-size: 19px; }
+    .content-max { max-width: 1600px; }
+  }
+
+  /* ── الوضع الأفقي على الهواتف (ارتفاع منخفض): تقليل الحشو الرأسي ── */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .compact-landscape {
+      padding-top: 0.3rem !important;
+      padding-bottom: 0.3rem !important;
+    }
+    .glass-card { max-height: 96vh; }
+  }
+
+  /* ── دعم الارتفاع الديناميكي الحقيقي (شريط المتصفح المتحرك على الموبايل) ── */
+  .h-screen-safe {
+    height: 100dvh;
+    height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+  }
+
+  /* ── ضمان عدم تجاوز أي عنصر عرض الشاشة (يمنع التمرير الأفقي على أصغر جهاز) ── */
+  .no-h-overflow {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* ── أهداف لمس مريحة — نطبّقها فقط على الأزرار التي تطلبها صراحةً ── */
+  /* (تجنّب فرض min-height عام يكسر شبكات الأزرار الصغيرة والمربّعات) */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
