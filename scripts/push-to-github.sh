@@ -8,10 +8,29 @@ echo "🚀 Notic Tahiro — رفع المشروع لـ GitHub"
 echo "=========================================="
 echo ""
 
-read -p "👤 اسم المستخدم (username): " USERNAME
-read -p "📦 اسم الـ Repository (مثل: notic-tahiro): " REPO_NAME
-read -s -p "🔑 الـ Token (ghp_...): " TOKEN
-echo ""
+# ─── المدخلات: المتغيّرات البيئية أولاً، ثم السؤال ──────────────────
+# يسمح بتشغيل غير تفاعلي في سطر واحد:
+#   GH_USER=… GH_REPO=… GH_TOKEN=… ./scripts/push-to-github.sh
+#
+# ⚠️ ولماذا هذا مهمّ عملياً: حين يُلصق أمر متعدّد الأسطر في Termux،
+# تبقى الأسطر التالية في مخزن الإدخال، فيلتهمها `read` كأنها أجوبة —
+# فيُنشأ repo باسم خاطئ بتوكن مقطوع. المتغيّرات تُنهي هذا الباب.
+#
+# وتبقى الأسئلة كما هي حين لا تُمرَّر متغيّرات، فلا ينكسر الاستعمال اليدوي.
+USERNAME="${GH_USER:-}"
+REPO_NAME="${GH_REPO:-}"
+TOKEN="${GH_TOKEN:-}"
+
+if [ -z "$USERNAME" ]; then
+  read -p "👤 اسم المستخدم (username): " USERNAME
+fi
+if [ -z "$REPO_NAME" ]; then
+  read -p "📦 اسم الـ Repository (مثل: notic-tahiro): " REPO_NAME
+fi
+if [ -z "$TOKEN" ]; then
+  read -s -p "🔑 الـ Token (ghp_...): " TOKEN
+  echo ""
+fi
 echo ""
 
 if [ -z "$USERNAME" ] || [ -z "$REPO_NAME" ] || [ -z "$TOKEN" ]; then
