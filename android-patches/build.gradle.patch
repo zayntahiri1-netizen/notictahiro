@@ -1,0 +1,31 @@
+# ============================================================
+# android/app/build.gradle  — أضف هذا القسم داخل android { }
+# ============================================================
+
+android {
+    defaultConfig {
+        applicationId "com.notictahiro.app"
+        versionCode 1          # ← ارفعه بمقدار 1 مع كل إصدار
+        versionName "1.0.0"    # ← اسم الإصدار للمستخدم
+        minSdk 24
+        targetSdk 36          # ← متطلب Google Play من 31 غشت 2026 (Android 16)
+        compileSdk 36
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: "release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS")
+            keyPassword System.getenv("KEY_PASSWORD")
+        }
+    }
+}

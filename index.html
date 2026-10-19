@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Notic Tahiro — مساعدك الذكي للإنتاجية</title>
+    <meta name="description" content="Notic Tahiro - مفكرة ذكية مدعومة بالذكاء الاصطناعي لإدارة ملاحظاتك، أفكارك، مهامك، وشؤونك المالية" />
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f0320" media="(prefers-color-scheme: dark)" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" sizes="32x32" href="/icons/favicon-32.png" type="image/png" />
+    <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
+
+    <!--
+      Apple Touch Icons — يجب أن تكون PNG معتمة (بدون شفافية).
+      FIX حرج: iOS لا يدعم الشفافية على الشاشة الرئيسية ويحوّل أي منطقة
+      شفافة إلى أسود. لذا نستخدم أيقونات apple-touch-icon المعتمة المخصّصة
+      (خلفية متدرّجة + الشعار) بدلاً من icon-512 الشفافة التي كانت ستظهر
+      بإطار أسود قبيح على أجهزة Apple.
+    -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/apple-touch-icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/apple-touch-icon-152.png" />
+    <link rel="apple-touch-icon" sizes="76x76"   href="/icons/apple-touch-icon-152.png" />
+
+    <!-- Apple PWA meta -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Notic Tahiro" />
+
+    <!-- Microsoft Tiles (Windows Phone / Edge PWA) -->
+    <meta name="msapplication-TileColor" content="#7c3aed" />
+    <meta name="msapplication-TileImage" content="/icons/apple-touch-icon-152.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Notic Tahiro" />
+    <meta property="og:description" content="مفكرة ذكية مدعومة بالذكاء الاصطناعي" />
+    <meta property="og:image" content="/icons/social-512.png" />
+    <meta property="og:type" content="website" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Notic Tahiro" />
+    <meta name="twitter:description" content="مفكرة ذكية مدعومة بالذكاء الاصطناعي" />
+    <meta name="twitter:image" content="/icons/social-512.png" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://oispxxmxltkmkcmoqxmy.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Permissions-Policy: only microphone for same origin (voice input) -->
+    <meta http-equiv="Permissions-Policy" content="microphone=(self)" />
+  </head>
+  <body class="antialiased">
+    <!--
+      ══════════════════════════════════════════════════════════════════
+      شبكة أمان الإقلاع
+      ══════════════════════════════════════════════════════════════════
+      ErrorBoundary يلتقط أخطاء التصيير فقط — بعد أن يبدأ React. أما إن
+      فشل تحميل حزمة JS أو رمى أي موديول وقت الاستيراد، فإن React لا يبدأ
+      أصلاً، و #root الفارغ يترك شاشة بيضاء. وهذا بالضبط ما تصفه Google
+      بـ"يتعذّر فتح تطبيقك": التطبيق يفتح، ولا يظهر شيء.
+
+      هنا نضمن أن يفتح التطبيق على شيء مهما حدث:
+        • محتوى احتياطي داخل #root يُرى فوراً (يستبدله React عند التركيب)
+        • التقاط الأخطاء قبل سكربت الوحدة — ليشمل أخطاء الاستيراد نفسها
+        • حارس زمني: إن لم يُركَّب React، نعرض شاشة استعادة تحمل الخطأ
+
+      ⚠️ لا يوجد هنا زرّ "مسح البيانات": فشل الإقلاع مزعج، أما محو
+      ملاحظات المستخدم بضغطة في لحظة إحباط فكارثة لا رجعة فيها.
+    -->
+    <script>
+      (function () {
+        window.__noticBootErrors = [];
+        function note(msg) {
+          try {
+            window.__noticBootErrors.push(String(msg).slice(0, 400));
+          } catch (e) { /* لا شيء يُسقط ملتقط الأخطاء نفسه */ }
+        }
+        /**
+         * تنظيف ذاتي من عامل خدمة مسموم.
+         *
+         * ⚠️ لماذا هنا لا في حزمة التطبيق:
+         * عامل الخدمة قد يُقدّم index.html قديماً يُشير إلى أصول بنيةٍ
+         * سابقة لم تعد موجودة. فتفشل الحزمة في التحميل أصلاً — ومعها كل
+         * منطق التنظيف لو كان بداخلها. المنقذ يجب أن يكون خارج ما يُنقذه.
+         *
+         * هذا السكربت مضمّن في الصفحة نفسها، فيعمل دائماً.
+         */
+        function purgeAndReload() {
+          try {
+            if (sessionStorage.getItem('notic-sw-purged')) return false;
+            sessionStorage.setItem('notic-sw-purged', '1');
+          } catch (e) { return false; } // لا تخزين = لا حارس = لا نُخاطر بحلقة
+          var jobs = [];
+          try {
+            if (navigator.serviceWorker) {
+              jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+              }));
+            }
+            if (window.caches) {
+              jobs.push(caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              }));
+            }
+          } catch (e) { /* نُكمل بما توفّر */ }
+          if (!jobs.length) return false;
+          Promise.all(jobs).catch(function () { return null; })
+            .then(function () { location.reload(); });
+          return true;
+        }
+
+        // capture=true ضروري: أخطاء تحميل الموارد (سكربت لم يصل) لا تنتشر
+        window.addEventListener('error', function (e) {
+          var el = e && e.target;
+          var isScript = el && el.tagName === 'SCRIPT';
+          note(e && e.message ? e.message
+               : (isScript ? 'script failed to load: ' + (el.src || '?') : 'load error'));
+          if (!isScript) return;
+          // سكربت لم يصل. السبب الأغلب: كاش قديم يُشير إلى أصلٍ محذوف.
+          // ⚠️ لكن لا نُنظّف ولا نُعيد التحميل إلا بعد التأكّد أن التطبيق
+          // لم يُركَّب: سكربتٌ ثانوي قد يفشل وحده بينما التطبيق يعمل، وإعادة
+          // تحميل تطبيقٍ شغّال عطبٌ من صنعنا لا إصلاح.
+          setTimeout(function () {
+            if (!document.getElementById('notic-boot')) return; // رُكّب فعلاً
+            if (purgeAndReload()) return;   // نظّفنا وسنُعيد التحميل
+            window.__noticShowRecovery();   // نُظّف من قبل ولم ينفع
+          }, 1200);
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          note((e && e.reason && (e.reason.message || e.reason)) || 'unhandled rejection');
+        });
+
+        window.__noticShowRecovery = function () {
+          var boot = document.getElementById('notic-boot');
+          if (!boot) return; // React ركّب فعلاً — لا شأن لنا
+          var errs = window.__noticBootErrors;
+          var detail = errs.length ? errs.join('\n') : 'no error captured';
+          boot.innerHTML =
+            '<div class="nb-card">' +
+              '<div class="nb-icon">⚠️</div>' +
+              '<div class="nb-title">تعذّر بدء التطبيق</div>' +
+              '<div class="nb-sub">The app could not start</div>' +
+              '<pre class="nb-err" id="nb-err"></pre>' +
+              '<button class="nb-btn" id="nb-retry">إعادة المحاولة · Retry</button>' +
+              '<button class="nb-btn nb-alt" id="nb-copy">نسخ تفاصيل الخطأ</button>' +
+              '<div class="nb-note">ملاحظاتك لم تُمسّ. أعد المحاولة، وإن تكرّر أرسل التفاصيل.</div>' +
+            '</div>';
+          document.getElementById('nb-err').textContent = detail;
+          document.getElementById('nb-retry').onclick = function () { location.reload(); };
+          document.getElementById('nb-copy').onclick = function () {
+            try {
+              navigator.clipboard.writeText(detail);
+              this.textContent = '✅ نُسخ';
+            } catch (e) {
+              // الحافظة محجوبة في بعض الـ WebView — النص ظاهر على الشاشة
+              this.textContent = 'النص ظاهر أعلاه';
+            }
+          };
+        };
+
+        // الحارس: إن بقي العنصر الاحتياطي بعد 8 ثوانٍ فإن React لم يُركَّب.
+        // 8 ثوانٍ لا 3: هاتف بطيء أو بارد قد يحتاج وقتاً، وشاشة خطأ تظهر
+        // لمن كان تطبيقه سيعمل بعد ثانية هي عطبٌ من صنعنا.
+        setTimeout(function () { window.__noticShowRecovery(); }, 8000);
+      })();
+    </script>
+
+    <style>
+      #notic-boot {
+        position: fixed; inset: 0; display: flex; align-items: center;
+        justify-content: center; padding: 24px; background: #0f0320;
+        color: #e9e4f5; font-family: 'Tajawal', 'Noto Kufi Arabic', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .nb-spinner {
+        width: 38px; height: 38px; border-radius: 50%;
+        border: 3px solid rgba(167,139,250,.25); border-top-color: #a78bfa;
+        animation: nb-spin .9s linear infinite;
+      }
+      @keyframes nb-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .nb-spinner { animation-duration: 3s; } }
+      .nb-card { width: 100%; max-width: 420px; text-align: center; }
+      .nb-icon { font-size: 40px; margin-bottom: 10px; }
+      .nb-title { font-size: 18px; font-weight: 800; }
+      .nb-sub { font-size: 12px; opacity: .55; margin-top: 2px; }
+      .nb-err {
+        margin: 14px 0; padding: 10px; border-radius: 12px; text-align: start;
+        background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+        color: #fca5a5; font-size: 11px; line-height: 1.5; direction: ltr;
+        white-space: pre-wrap; word-break: break-word; max-height: 30vh; overflow: auto;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      .nb-btn {
+        display: block; width: 100%; margin-top: 8px; padding: 12px;
+        border: 0; border-radius: 14px; font-size: 14px; font-weight: 700;
+        color: #fff; background: linear-gradient(135deg, #7c3aed, #a855f7); cursor: pointer;
+      }
+      .nb-btn.nb-alt { background: rgba(255,255,255,.08); color: #cfc7e6; }
+      .nb-note { margin-top: 14px; font-size: 11px; opacity: .5; line-height: 1.6; }
+    </style>
+
+    <!-- يستبدله React فور التركيب؛ بقاؤه يعني أن الإقلاع فشل -->
+    <div id="root"><div id="notic-boot"><div class="nb-spinner"></div></div></div>
+
+    <script type="module" src="/src/main.tsx" onerror="window.__noticShowRecovery&&window.__noticShowRecovery()"></script>
+  </body>
+</html>

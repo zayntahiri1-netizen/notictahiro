@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "971276439424",
+    "firebase_url": "https://notictahiro-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "notictahiro",
+    "storage_bucket": "notictahiro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971276439424:android:73ce78a16d4b58e5da3b65",
+        "android_client_info": {
+          "package_name": "com.notictahiro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj_vYapDy-s17hadvUXrSORr3nQruhRuo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
