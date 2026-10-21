@@ -120,7 +120,20 @@ export async function speak(opts: SpeakOptions): Promise<boolean> {
   if (!cleanText) return false;
 
   // ─── 0. صوت Gemini الحماسي أولاً (إن طُلب وتوفّر إنترنت) ───────────
-  if (preferGemini) {
+  //
+  // ⚠️ حدّ الطول ليس تحسيناً — بدونه لا يُسمع صوت Gemini أصلاً.
+  // زرّ الاستماع يرسل حتى 4000 حرف في طلب واحد، وهي بالعربية ~800 كلمة
+  // أي أكثر من خمس دقائق صوت. توليدها يتجاوز مهلة 45 ثانية في العميل،
+  // فتُقطع المحاولة ويسقط النطق إلى محرّك الجهاز — بعد 45 ثانية من زرّ
+  // واقف عند "جارٍ التحميل". فيظنّ المستخدم أن الميزة معطّلة، ولا يسمع
+  // صوت Gemini ولو مرّة.
+  //
+  // الحدّ هنا يقلب المعادلة: النصّ القصير والمتوسّط يُقرأ بصوت Gemini
+  // فوراً، والطويل يبدأ بصوت الجهاز **حالاً** بدل انتظارٍ ينتهي إليه.
+  // (الإصلاح الكامل تقطيعُ النصّ إلى مقاطع وتشغيلها بالتتابع.)
+  const GEMINI_MAX_CHARS = 1200;
+
+  if (preferGemini && cleanText.length <= GEMINI_MAX_CHARS) {
     const geminiOk = await trySpeakGemini(cleanText, onEnd, onError, style, voiceName);
     if (geminiOk) return true;
     // فشل Gemini (لا إنترنت/خطأ) → نكمل لمحرك الجهاز أدناه
@@ -241,6 +254,57 @@ function speakWeb(
     return true;
   }
   return doSpeak();
+}
+
+/**
+ * يُجمّد النطق الجاري في مكانه (لا يُلغيه).
+ *
+ * يُعيد true إن أمكن التجميد الحقيقي داخل المقطع الجاري:
+ *   • صوت Gemini  → عنصر <audio>، فالإيقاف والاستئناف دقيقان تماماً.
+ *   • محرّك المتصفح → speechSynthesis.pause() مدعوم.
+ *   • محرّك أندرويد الأصلي → لا يملك إيقافاً مؤقّتاً إطلاقاً، فيُعيد false.
+ *
+ * ولهذا يُدير المشغّل (ttsPlayer) الاستئناف على مستوى **المقاطع** أيضاً:
+ * ما لا يستطيع المحرّك استئنافه داخلياً، نستأنفه بإعادة تشغيل المقطع
+ * الذي توقّفنا عنده. فيبقى السلوك واحداً عند المستخدم مهما كان المحرّك.
+ */
+export function pauseSpeaking(): boolean {
+  let paused = false;
+  if (_currentAudio) {
+    try { _currentAudio.pause(); paused = true; } catch { /* ignore */ }
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+        paused = true;
+      }
+    } catch { /* ignore */ }
+  }
+  return paused;
+}
+
+/** يستأنف ما جُمِّد. يُعيد true إن نجح الاستئناف الداخلي. */
+export function resumeSpeaking(): boolean {
+  let resumed = false;
+  if (_currentAudio) {
+    try { void _currentAudio.play(); resumed = true; } catch { /* ignore */ }
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); resumed = true; }
+    } catch { /* ignore */ }
+  }
+  return resumed;
+}
+
+/** هل هناك نطق جارٍ الآن؟ (يستعمله المشغّل لتفادي تداخل صوتين) */
+export function isSpeaking(): boolean {
+  if (_currentAudio && !_currentAudio.paused) return true;
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try { return window.speechSynthesis.speaking; } catch { return false; }
+  }
+  return false;
 }
 
 /** يوقف أي نطق جارٍ (أصلي أو ويب) */

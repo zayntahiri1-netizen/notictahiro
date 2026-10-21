@@ -27,6 +27,7 @@ import { CaretSafeInput } from './CaretSafe';
 import { PlainEditable, type PlainEditableHandle } from './PlainEditable';
 
 import ListenButton from './ListenButton';
+import VoicePicker from './VoicePicker';
 interface NoteEditorProps {
   noteId: string | null;
   isNewNote?: boolean;
@@ -49,7 +50,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
           errNoUrl: '⚠️ لم يُضبط VITE_SUPABASE_URL في .env — راجع إعداد Supabase.',
           errRate: '⚠️ تجاوزت الحد المسموح من الطلبات (60/ساعة). حاول بعد قليل.',
           errConn: '⚠️ تعذّر الاتصال بـ Gemini — تأكد من الإنترنت وإعداد Supabase.',
-          genTasks: 'توليد قائمة مهام تلقائية ✨', voice: 'تسجيل صوتي 🎙️', vrDeleteRecording: 'حذف التسجيل', vrWrongPin: '❌ رقم سري خاطئ، حاول مجدداً', lockAdd: 'حماية برقم سري', lockChange: 'تغيير الرقم السري', lockRemove: 'إزالة الحماية', rmLockTitle: 'إزالة الحماية برقم سري', rmLockMsg: 'سيُحفَظ محتوى الملاحظة بدون تشفير بعد الآن. هل تريد المتابعة؟', rmLockConfirm: '🔓 نعم، أزل الحماية', rmLockCancel: 'تراجع', unsavedTitle: 'تغييرات غير محفوظة', unsavedMsg: 'لديك تغييرات لم تُحفَظ. هل تريد حفظها قبل الخروج؟', unsavedSave: '💾 حفظ والخروج', unsavedDiscard: 'خروج بدون حفظ', unpin: 'إلغاء التثبيت', pin: 'تثبيت الملاحظة',
+          genTasks: 'توليد قائمة مهام تلقائية ✨', voice: 'تسجيل صوتي 🎙️', vrAutoNote: 'نُسخ هذا النص تلقائياً من تسجيل صوتي.', vrDeleteRecording: 'حذف التسجيل', vrWrongPin: '❌ رقم سري خاطئ، حاول مجدداً', lockAdd: 'حماية برقم سري', lockChange: 'تغيير الرقم السري', lockRemove: 'إزالة الحماية', rmLockTitle: 'إزالة الحماية برقم سري', rmLockMsg: 'سيُحفَظ محتوى الملاحظة بدون تشفير بعد الآن. هل تريد المتابعة؟', rmLockConfirm: '🔓 نعم، أزل الحماية', rmLockCancel: 'تراجع', unsavedTitle: 'تغييرات غير محفوظة', unsavedMsg: 'لديك تغييرات لم تُحفَظ. هل تريد حفظها قبل الخروج؟', unsavedSave: '💾 حفظ والخروج', unsavedDiscard: 'خروج بدون حفظ', unpin: 'إلغاء التثبيت', pin: 'تثبيت الملاحظة',
           pinned: 'مثبّت', pinShort: 'تثبيت', delNote: 'حذف الملاحظة', del: 'حذف', saveNote: 'حفظ الملاحظة',
           saving: 'يحفظ...', saved: 'محفوظ', save: 'حفظ', unsaved: '● تغييرات غير محفوظة', savedDone: 'تم الحفظ',
           noProject: 'بدون مشروع', alarmOn: 'منبه مفعّل', addAlarm: 'إضافة منبه', aiAssist: 'AI مساعد',
@@ -75,7 +76,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
           errNoUrl: '⚠️ VITE_SUPABASE_URL is not set in .env — check your Supabase setup.',
           errRate: '⚠️ Rate limit exceeded (60/hour). Please try again shortly.',
           errConn: '⚠️ Could not connect to Gemini — check your internet and Supabase setup.',
-          genTasks: 'Generate auto task list ✨', voice: 'Voice recording 🎙️', vrDeleteRecording: 'Delete recording', vrWrongPin: '❌ Incorrect PIN, try again', lockAdd: 'Protect with PIN', lockChange: 'Change PIN', lockRemove: 'Remove protection', rmLockTitle: 'Remove PIN protection', rmLockMsg: 'The note content will be saved unencrypted from now on. Continue?', rmLockConfirm: '🔓 Yes, remove', rmLockCancel: 'Cancel', unsavedTitle: 'Unsaved changes', unsavedMsg: 'You have unsaved changes. Save before leaving?', unsavedSave: '💾 Save & exit', unsavedDiscard: 'Exit without saving', unpin: 'Unpin', pin: 'Pin note',
+          genTasks: 'Generate auto task list ✨', voice: 'Voice recording 🎙️', vrAutoNote: 'This text was transcribed automatically from a voice recording.', vrDeleteRecording: 'Delete recording', vrWrongPin: '❌ Incorrect PIN, try again', lockAdd: 'Protect with PIN', lockChange: 'Change PIN', lockRemove: 'Remove protection', rmLockTitle: 'Remove PIN protection', rmLockMsg: 'The note content will be saved unencrypted from now on. Continue?', rmLockConfirm: '🔓 Yes, remove', rmLockCancel: 'Cancel', unsavedTitle: 'Unsaved changes', unsavedMsg: 'You have unsaved changes. Save before leaving?', unsavedSave: '💾 Save & exit', unsavedDiscard: 'Exit without saving', unpin: 'Unpin', pin: 'Pin note',
           pinned: 'Pinned', pinShort: 'Pin', delNote: 'Delete note', del: 'Delete', saveNote: 'Save note',
           saving: 'Saving...', saved: 'Saved', save: 'Save', unsaved: '● Unsaved changes', savedDone: 'Saved',
           noProject: 'No project', alarmOn: 'Alarm on', addAlarm: 'Add alarm', aiAssist: 'AI assist',
@@ -101,7 +102,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
           errNoUrl: '⚠️ VITE_SUPABASE_URL no está configurado en .env — revisa tu configuración de Supabase.',
           errRate: '⚠️ Límite de solicitudes superado (60/hora). Inténtalo en breve.',
           errConn: '⚠️ No se pudo conectar con Gemini — revisa tu internet y configuración de Supabase.',
-          genTasks: 'Generar lista de tareas ✨', voice: 'Grabación de voz 🎙️', vrDeleteRecording: 'Eliminar grabación', vrWrongPin: '❌ PIN incorrecto, inténtalo de nuevo', lockAdd: 'Proteger con PIN', lockChange: 'Cambiar PIN', lockRemove: 'Quitar protección', rmLockTitle: 'Quitar protección PIN', rmLockMsg: 'El contenido se guardará sin cifrar a partir de ahora. ¿Continuar?', rmLockConfirm: '🔓 Sí, quitar', rmLockCancel: 'Cancelar', unsavedTitle: 'Cambios sin guardar', unsavedMsg: 'Tienes cambios sin guardar. ¿Guardar antes de salir?', unsavedSave: '💾 Guardar y salir', unsavedDiscard: 'Salir sin guardar', unpin: 'Quitar fijado', pin: 'Fijar nota',
+          genTasks: 'Generar lista de tareas ✨', voice: 'Grabación de voz 🎙️', vrAutoNote: 'Este texto se transcribió automáticamente de una grabación de voz.', vrDeleteRecording: 'Eliminar grabación', vrWrongPin: '❌ PIN incorrecto, inténtalo de nuevo', lockAdd: 'Proteger con PIN', lockChange: 'Cambiar PIN', lockRemove: 'Quitar protección', rmLockTitle: 'Quitar protección PIN', rmLockMsg: 'El contenido se guardará sin cifrar a partir de ahora. ¿Continuar?', rmLockConfirm: '🔓 Sí, quitar', rmLockCancel: 'Cancelar', unsavedTitle: 'Cambios sin guardar', unsavedMsg: 'Tienes cambios sin guardar. ¿Guardar antes de salir?', unsavedSave: '💾 Guardar y salir', unsavedDiscard: 'Salir sin guardar', unpin: 'Quitar fijado', pin: 'Fijar nota',
           pinned: 'Fijada', pinShort: 'Fijar', delNote: 'Eliminar nota', del: 'Eliminar', saveNote: 'Guardar nota',
           saving: 'Guardando...', saved: 'Guardado', save: 'Guardar', unsaved: '● Cambios sin guardar', savedDone: 'Guardado',
           noProject: 'Sin proyecto', alarmOn: 'Alarma activada', addAlarm: 'Añadir alarma', aiAssist: 'IA',
@@ -127,7 +128,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
           errNoUrl: '⚠️ .env 中未设置 VITE_SUPABASE_URL — 请检查 Supabase 配置。',
           errRate: '⚠️ 已超出请求限制（60/小时）。请稍后再试。',
           errConn: '⚠️ 无法连接 Gemini — 请检查网络和 Supabase 配置。',
-          genTasks: '自动生成任务清单 ✨', voice: '语音录制 🎙️', vrDeleteRecording: '删除录音', vrWrongPin: '❌ 密码错误，请重试', lockAdd: '用密码保护', lockChange: '更改密码', lockRemove: '移除保护', rmLockTitle: '移除密码保护', rmLockMsg: '此后笔记内容将以未加密方式保存。是否继续？', rmLockConfirm: '🔓 是，移除', rmLockCancel: '取消', unsavedTitle: '未保存的更改', unsavedMsg: '您有未保存的更改。退出前保存吗？', unsavedSave: '💾 保存并退出', unsavedDiscard: '不保存退出', unpin: '取消置顶', pin: '置顶笔记',
+          genTasks: '自动生成任务清单 ✨', voice: '语音录制 🎙️', vrAutoNote: '此文本由语音录音自动转写。', vrDeleteRecording: '删除录音', vrWrongPin: '❌ 密码错误，请重试', lockAdd: '用密码保护', lockChange: '更改密码', lockRemove: '移除保护', rmLockTitle: '移除密码保护', rmLockMsg: '此后笔记内容将以未加密方式保存。是否继续？', rmLockConfirm: '🔓 是，移除', rmLockCancel: '取消', unsavedTitle: '未保存的更改', unsavedMsg: '您有未保存的更改。退出前保存吗？', unsavedSave: '💾 保存并退出', unsavedDiscard: '不保存退出', unpin: '取消置顶', pin: '置顶笔记',
           pinned: '已置顶', pinShort: '置顶', delNote: '删除笔记', del: '删除', saveNote: '保存笔记',
           saving: '保存中...', saved: '已保存', save: '保存', unsaved: '● 未保存的更改', savedDone: '已保存',
           noProject: '无项目', alarmOn: '提醒已开启', addAlarm: '添加提醒', aiAssist: 'AI 助手',
@@ -153,7 +154,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
     taskImpl: 'Implementation and testing', taskReview: 'Final review', checklistHeading: '\n\n## ✅ Checklist generated by Gemini\n',
     headingAr: '## 🌐 العربية', headingEn: '## 🌐 English',
     errNoUrl: '⚠️ VITE_SUPABASE_URL is not set in .env.', errRate: '⚠️ Rate limit exceeded (60/hour).', errConn: '⚠️ Could not connect to Gemini.',
-    genTasks: 'Generate auto task list ✨', voice: 'Voice recording 🎙️', vrDeleteRecording: 'Delete recording', vrWrongPin: '❌ Incorrect PIN, try again', lockAdd: 'Protect with PIN', lockChange: 'Change PIN', lockRemove: 'Remove protection', rmLockTitle: 'Remove PIN protection', rmLockMsg: 'The note content will be saved unencrypted from now on. Continue?', rmLockConfirm: '🔓 Yes, remove', rmLockCancel: 'Cancel', unpin: 'Unpin', pin: 'Pin note', pinned: 'Pinned', pinShort: 'Pin',
+    genTasks: 'Generate auto task list ✨', voice: 'Voice recording 🎙️', vrAutoNote: 'This text was transcribed automatically from a voice recording.', vrDeleteRecording: 'Delete recording', vrWrongPin: '❌ Incorrect PIN, try again', lockAdd: 'Protect with PIN', lockChange: 'Change PIN', lockRemove: 'Remove protection', rmLockTitle: 'Remove PIN protection', rmLockMsg: 'The note content will be saved unencrypted from now on. Continue?', rmLockConfirm: '🔓 Yes, remove', rmLockCancel: 'Cancel', unpin: 'Unpin', pin: 'Pin note', pinned: 'Pinned', pinShort: 'Pin',
     delNote: 'Delete note', del: 'Delete', saveNote: 'Save note', saving: 'Saving...', saved: 'Saved', save: 'Save',
     unsaved: '● Unsaved changes', savedDone: 'Saved', noProject: 'No project', alarmOn: 'Alarm on', addAlarm: 'Add alarm', aiAssist: 'AI assist',
     date: 'Date', time: 'Time', recurring: 'Recurring', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly',
@@ -1129,6 +1130,7 @@ export default function NoteEditor({ noteId, isNewNote = false, newNoteType = 'n
                 {/* استماع لمحتوى الملاحظة بصوت حماسي */}
                 <ListenButton size="sm" style="energetic" darkMode={darkMode}
                   label="استمع للملاحظة" text={() => `${title}. ${content}`} />
+                <VoicePicker variant="plain" darkMode={darkMode} />
                 <button
                   onClick={() => setPreviewMode(false)}
                   aria-label={E.editMode}

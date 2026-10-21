@@ -30,6 +30,13 @@ interface MarkdownViewProps {
   onOpenLink?: (noteId: string | null, title: string) => void;
   darkMode?: boolean;
   className?: string;
+  /**
+   * أحجام عناوين مضغوطة، لفقاعات الدردشة.
+   * العناوين الافتراضية تبدأ من text-3xl — وهو مقاس صفحة لا مقاس فقاعة
+   * عرضها 85% من شاشة هاتف. وتمريرها عبر className لا يُجدي: الأحجام
+   * تُطبَّق على كل عنصر عنوان بنفسه، فلا يغلبها صنف على الأب.
+   */
+  compact?: boolean;
 }
 
 /** يُحوّل النصّ المُسطَّر إلى React nodes مع تنسيق inline (غامق، مائل، كود، روابط) */
@@ -114,6 +121,7 @@ export default function MarkdownView({
   onOpenLink,
   darkMode,
   className = '',
+  compact = false,
 }: MarkdownViewProps) {
   const lines = source.split('\n');
   const blocks: React.ReactNode[] = [];
@@ -204,12 +212,15 @@ export default function MarkdownView({
       flushList(`l-${i}`);
       const level = heading[1].length;
       const text = heading[2];
-      const sizes = ['text-3xl', 'text-2xl', 'text-xl', 'text-lg', 'text-base', 'text-sm'];
+      const sizes = compact
+        ? ['text-base', 'text-sm', 'text-sm', 'text-sm', 'text-sm', 'text-sm']
+        : ['text-3xl', 'text-2xl', 'text-xl', 'text-lg', 'text-base', 'text-sm'];
+      const spacing = compact ? 'mt-3 mb-1.5' : 'mt-4 mb-2';
       const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
       blocks.push(
         React.createElement(
           Tag,
-          { key: `h-${i}`, className: `${sizes[level - 1]} font-black mt-4 mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}` },
+          { key: `h-${i}`, className: `${sizes[level - 1]} font-black ${spacing} ${darkMode ? 'text-white' : 'text-gray-900'}` },
           renderInline(text, notes, onOpenLink, `h${i}`, darkMode)
         )
       );

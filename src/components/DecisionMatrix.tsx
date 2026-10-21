@@ -4,6 +4,7 @@ import { callGemini } from '../utils/geminiService';
 import { CaretSafeTextarea } from './CaretSafe';
 
 import ListenButton from './ListenButton';
+import VoicePicker from './VoicePicker';
 interface ComparisonItem {
   name: string;
   emoji: string;
@@ -51,9 +52,40 @@ const ANALYSIS_DB: Record<string, { title: string; items: ComparisonItem[]; reco
   }
 };
 
+/**
+ * ⚠️ نوع صريح لنصوص الواجهة — وهو إصلاح بنيوي لا تنظيم.
+ *
+ * كان كائن اللغات بلا نوع، فسقطت سبعة مفاتيح من العربية وحدها بلا أن
+ * ينبّه المدقّق. ونتيجتها في الاستعمال العربي — وهو الاستعمال الأساسي:
+ *   • M.genPro(1)  →  TypeError: M.genPro is not a function
+ *     فيسقط المسار الاحتياطي كلّه صامتاً حين ينقطع الإنترنت: يدور الزرّ
+ *     ثم لا يظهر شيء، بلا رسالة ولا تفسير.
+ *   • M.genReason  →  يُعرض للمستخدم نصّاً حرفياً: "undefined"
+ *   • M.byNotic    →  تذييل الملاحظة المحفوظة: "صُنع بـundefined"
+ *
+ * بهذا النوع يصير نقصُ مفتاحٍ في أي لغة خطأَ ترجمةٍ يظهر فوراً، لا
+ * مفاجأةَ تشغيلٍ تظهر عند المستخدم.
+ */
+interface DMStrings {
+  noteTitle: (t: string) => string;
+  tags: string[];
+  low: string; medium: string; high: string;
+  header: string; subtitle: string;
+  inputTitle: string; inputPh: string;
+  detected: string; detTech: string; detInvest: string; detFramework: string;
+  pickExample: string; ex1: string; ex2: string; ex3: string;
+  analyzing: boolean; solve: string; criterion: string; cost: string; risk: string;
+  implTime: string; score: string; recommendation: string; pros: string; cons: string;
+  finalRec: string; newAnalysis: string; hideTable: string; showTable: string;
+  saveNote: string; genTitle: string; analyzingDeep: string;
+  genPro: (n: number) => string; genCon: (n: number) => string;
+  undefined_: string; genReason: string; byNotic: string;
+  needTwo: string; failed: string;
+}
+
 export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
   const { darkMode, addNote, language } = useApp();
-  const DM = {
+  const DM_ALL: Record<'ar' | 'en' | 'es' | 'zh', DMStrings> = {
     ar: { noteTitle: (t: string) => `📊 قرار: ${t}`, tags: ['قرار', 'تحليل', 'AI'],
           low: '🟢 منخفضة', medium: '🟡 متوسطة', high: '🔴 عالية',
           header: 'مصفوفة اتخاذ القرار', subtitle: 'تحويل التفكير العشوائي والحيرة إلى قرار واضح بمقارنة منهجية',
@@ -63,8 +95,8 @@ export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
           ex2: 'أقارن بين الاستثمار في SOL أو LINK', ex3: 'أي إطار أفضل: React أم Vue أم Angular',
           analyzing: true, solve: 'حل الحيرة واتخاذ القرار', criterion: 'المعيار', cost: '💰 التكلفة', risk: '⚠️ المخاطر',
           implTime: '⏱️ وقت التنفيذ', score: '📊 التقييم', recommendation: '⭐ التوصية', pros: '✅ المميزات:', cons: '❌ العيوب:',
-          finalRec: 'التوصية النهائية', newAnalysis: '{M.newAnalysis}', hideTable: '👁️ إخفاء الجدول', showTable: '📋 جدول Markdown',
-          saveNote: '{M.saveNote}' },
+          finalRec: 'التوصية النهائية', newAnalysis: '🔄 تحليل جديد', hideTable: '👁️ إخفاء الجدول', showTable: '📋 جدول Markdown',
+          saveNote: '💾 حفظ كملاحظة منظَّمة', genTitle: 'تحليل مقارن', analyzingDeep: 'تحليل معمّق جارٍ…', genPro: (n: number) => `نقطة قوة ${n}`, genCon: (n: number) => `نقطة ضعف ${n}`, undefined_: 'غير محدَّد', genReason: 'بناءً على المعطيات المتاحة، يبدو هذا الخيار الأكثر توازناً. يُنصح بمراجعة التفاصيل قبل الحسم.', byNotic: 'صُنع بمصفوفة قرار Notic AI', needTwo: 'اكتب خيارين على الأقل — مثلاً: «أشتري سيارة أو أكتري دار».', failed: 'تعذّر التحليل. تحقّق من اتصالك وأعد المحاولة.' },
     en: { noteTitle: (t: string) => `📊 Decision: ${t}`, tags: ['decision', 'analysis', 'AI'],
           low: '🟢 Low', medium: '🟡 Medium', high: '🔴 High',
           header: 'Decision matrix', subtitle: 'Turn scattered thinking and hesitation into a clear decision with a systematic comparison',
@@ -75,7 +107,7 @@ export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
           analyzing: true, solve: 'Resolve and decide', criterion: 'Criterion', cost: '💰 Cost', risk: '⚠️ Risk',
           implTime: '⏱️ Time to implement', score: '📊 Score', recommendation: '⭐ Recommendation', pros: '✅ Pros:', cons: '❌ Cons:',
           finalRec: 'Final recommendation', newAnalysis: '🔄 New analysis', hideTable: '👁️ Hide table', showTable: '📋 Markdown table',
-          saveNote: '💾 Save as organized note', genTitle: 'Comparative analysis', analyzingDeep: 'Deep analysis in progress...', genPro: (n: number) => `Strength ${n}`, genCon: (n: number) => `Weakness ${n}`, undefined_: 'Unspecified', genReason: 'Based on the available data, this option seems the most balanced. Reviewing the details is recommended.', byNotic: 'Made by Notic AI Decision Matrix' },
+          saveNote: '💾 Save as organized note', genTitle: 'Comparative analysis', analyzingDeep: 'Deep analysis in progress...', genPro: (n: number) => `Strength ${n}`, genCon: (n: number) => `Weakness ${n}`, undefined_: 'Unspecified', genReason: 'Based on the available data, this option seems the most balanced. Reviewing the details is recommended.', byNotic: 'Made by Notic AI Decision Matrix', needTwo: 'Write at least two options — e.g. "buy a car or rent a house".', failed: 'Analysis failed. Check your connection and try again.' },
     es: { noteTitle: (t: string) => `📊 Decisión: ${t}`, tags: ['decisión', 'análisis', 'AI'],
           low: '🟢 Bajo', medium: '🟡 Medio', high: '🔴 Alto',
           header: 'Matriz de decisión', subtitle: 'Convierte el pensamiento disperso y la duda en una decisión clara con una comparación sistemática',
@@ -86,7 +118,7 @@ export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
           analyzing: true, solve: 'Resolver y decidir', criterion: 'Criterio', cost: '💰 Costo', risk: '⚠️ Riesgo',
           implTime: '⏱️ Tiempo de implementación', score: '📊 Puntuación', recommendation: '⭐ Recomendación', pros: '✅ Ventajas:', cons: '❌ Desventajas:',
           finalRec: 'Recomendación final', newAnalysis: '🔄 Nuevo análisis', hideTable: '👁️ Ocultar tabla', showTable: '📋 Tabla Markdown',
-          saveNote: '💾 Guardar como nota organizada', genTitle: 'Análisis comparativo', analyzingDeep: 'Análisis profundo en curso...', genPro: (n: number) => `Fortaleza ${n}`, genCon: (n: number) => `Debilidad ${n}`, undefined_: 'No especificado', genReason: 'Según los datos disponibles, esta opción parece la más equilibrada. Se recomienda revisar los detalles.', byNotic: 'Hecho por Notic AI Decision Matrix' },
+          saveNote: '💾 Guardar como nota organizada', genTitle: 'Análisis comparativo', analyzingDeep: 'Análisis profundo en curso...', genPro: (n: number) => `Fortaleza ${n}`, genCon: (n: number) => `Debilidad ${n}`, undefined_: 'No especificado', genReason: 'Según los datos disponibles, esta opción parece la más equilibrada. Se recomienda revisar los detalles.', byNotic: 'Hecho por Notic AI Decision Matrix', needTwo: 'Escribe al menos dos opciones — p. ej. "comprar un coche o alquilar una casa".', failed: 'El análisis falló. Revisa tu conexión e inténtalo de nuevo.' },
     zh: { noteTitle: (t: string) => `📊 决策：${t}`, tags: ['决策', '分析', 'AI'],
           low: '🟢 低', medium: '🟡 中', high: '🔴 高',
           header: '决策矩阵', subtitle: '通过系统比较，将零散的思考和犹豫转化为清晰的决策',
@@ -97,9 +129,10 @@ export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
           analyzing: true, solve: '解决困惑并决策', criterion: '标准', cost: '💰 成本', risk: '⚠️ 风险',
           implTime: '⏱️ 实施时间', score: '📊 评分', recommendation: '⭐ 推荐', pros: '✅ 优点：', cons: '❌ 缺点：',
           finalRec: '最终推荐', newAnalysis: '🔄 新分析', hideTable: '👁️ 隐藏表格', showTable: '📋 Markdown 表格',
-          saveNote: '💾 保存为有条理的笔记', genTitle: '比较分析', analyzingDeep: '深度分析中...', genPro: (n: number) => `优势 ${n}`, genCon: (n: number) => `劣势 ${n}`, undefined_: '未指定', genReason: '根据可用数据，此选项似乎最均衡。建议查看详细信息。', byNotic: '由 Notic AI 决策矩阵生成' },
-  }[(language as 'ar'|'en'|'es'|'zh')] ?? null;
-  const M = DM ?? {
+          saveNote: '💾 保存为有条理的笔记', genTitle: '比较分析', analyzingDeep: '深度分析中...', genPro: (n: number) => `优势 ${n}`, genCon: (n: number) => `劣势 ${n}`, undefined_: '未指定', genReason: '根据可用数据，此选项似乎最均衡。建议查看详细信息。', byNotic: '由 Notic AI 决策矩阵生成', needTwo: '请至少写出两个选项 — 例如"买车还是租房"。', failed: '分析失败。请检查网络连接后重试。' },
+  };
+  const DM = DM_ALL[(language as 'ar'|'en'|'es'|'zh')] ?? null;
+  const M: DMStrings = DM ?? {
     noteTitle: (t: string) => `📊 Decision: ${t}`, tags: ['decision', 'analysis', 'AI'],
     low: '🟢 Low', medium: '🟡 Medium', high: '🔴 High',
     header: 'Decision matrix', subtitle: 'Turn scattered thinking into a clear decision with a systematic comparison',
@@ -110,23 +143,64 @@ export default function DecisionMatrix({ onClose }: DecisionMatrixProps) {
     analyzing: true, solve: 'Resolve and decide', criterion: 'Criterion', cost: '💰 Cost', risk: '⚠️ Risk',
     implTime: '⏱️ Time to implement', score: '📊 Score', recommendation: '⭐ Recommendation', pros: '✅ Pros:', cons: '❌ Cons:',
     finalRec: 'Final recommendation', newAnalysis: '🔄 New analysis', hideTable: '👁️ Hide table', showTable: '📋 Markdown table',
-    saveNote: '💾 Save as organized note', genTitle: 'Comparative analysis', analyzingDeep: 'Deep analysis in progress...', genPro: (n: number) => `Strength ${n}`, genCon: (n: number) => `Weakness ${n}`, undefined_: 'Unspecified', genReason: 'Based on the available data, this option seems the most balanced. Reviewing the details is recommended.', byNotic: 'Made by Notic AI Decision Matrix' };
+    saveNote: '💾 Save as organized note', genTitle: 'Comparative analysis', analyzingDeep: 'Deep analysis in progress...', genPro: (n: number) => `Strength ${n}`, genCon: (n: number) => `Weakness ${n}`, undefined_: 'Unspecified', genReason: 'Based on the available data, this option seems the most balanced. Reviewing the details is recommended.', byNotic: 'Made by Notic AI Decision Matrix', needTwo: 'Write at least two options — e.g. "buy a car or rent a house".', failed: 'Analysis failed. Check your connection and try again.' };
   const [inputText, setInputText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // ⚠️ لم تكن هناك أي رسالة خطأ. حين يفشل التحليل ولا يُنتج التقسيم
+  // خيارين، كان الزرّ يدور ثم يتوقّف ولا يظهر شيء — بلا سبب ولا إرشاد.
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ title: string; items: ComparisonItem[]; recommendation: string; reasoning: string } | null>(null);
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
 
-  // كشف نوع التحليل
+  /**
+   * كشف المقارنات الجاهزة الثلاث.
+   *
+   * ⚠️ كان الكشف بـ `t.includes('sol')` و `includes('link')` — أي مطابقة
+   * جزء كلمة. والنتيجة أن أسئلة لا علاقة لها بالعملات كانت تُجاب بتحليل
+   * استثماري جاهز عن Solana و Chainlink، بدرجات وتوصية:
+   *     "Which solution is better for my team?"   →  🪙 تحليل عملات
+   *     "console logging vs a real logger"        →  🪙 تحليل عملات
+   *     "Is a solid state drive worth it?"        →  🪙 تحليل عملات
+   * وتقديم توصية استثمارية لمن سأل عن التسجيل ليس خطأ عرضٍ — بل جواب
+   * خاطئ في موضوع مالي، وهو أخطر ما في الباب.
+   *
+   * القاعدة هنا بنيوية لا لفظية: المقارنة الجاهزة تقارن **طرفين
+   * مسمّيين**، فلا تُستدعى إلا إذا ورد الطرفان معاً. وحدود الكلمات تمنع
+   * "sol" داخل solution و console، و"link" داخل hyperlink.
+   */
+  const PRESET_TRIGGERS: Record<string, [RegExp, RegExp]> = {
+    'firebase-node': [/\bfirebase\b|cloud\s*functions?/i, /\bnode(\.js)?\b|سيرفر|خادم/i],
+    'sol-link':      [/\bsolana\b|\bsol\b|سولانا/i,       /\bchainlink\b|\blink\b|تشين\s*لينك/i],
+    'react-vue':     [/\breact\b|رياكت/i,                  /\bvue\b|\bangular\b|فيو|أنجولار/i],
+  };
+
   const detectedAnalysis = useMemo(() => {
-    const t = inputText.toLowerCase();
-    if (t.includes('firebase') || t.includes('node') || t.includes('سيرفر') || t.includes('cloud')) return 'firebase-node';
-    if (t.includes('sol') || t.includes('link') || t.includes('عملة') || t.includes('كربتو') || t.includes('استثمار')) return 'sol-link';
-    if (t.includes('react') || t.includes('vue') || t.includes('angular') || t.includes('إطار')) return 'react-vue';
+    const t = inputText;
+    for (const [key, [a, b]] of Object.entries(PRESET_TRIGGERS)) {
+      if (a.test(t) && b.test(t)) return key;
+    }
     return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputText]);
+
+  /**
+   * فاصل الخيارات.
+   *
+   * ⚠️ كان `/[,\nأو]|مقابل|ضد/` — و`[...]` فئة أحرف لا كلمة، فكان
+   * يُقسّم عند **كلّ حرف أ أو و** في النصّ، لا عند كلمة "أو":
+   *   "الوقت مقابل المال"       →  [" المال"]      (خيار واحد ⇒ لا نتيجة)
+   *   "نشري موطور ولا طوموبيل"  →  ["نشري م","لا ط","بيل"]
+   *   "أشتري سيارة أو أكتري دار" →  ["شتري سيارة","كتري دار"]  (الهمزة تُبتلع)
+   * أي أن الميزة كانت تنهار على أغلب المدخلات العربية.
+   *
+   * هنا الكلمات تُطلب محاطةً بمسافات، فلا تُطابَق داخل كلمة. وأُضيفت
+   * الفاصلة العربية «،» — وهي الأشيع في الكتابة العربية وكانت غائبة.
+   */
+  const SPLIT_OPTIONS = /\s+(?:أو|أم|ولا|مقابل|ضدّ|ضد|vs\.?|versus|or)\s+|[،,؛;\n]+/i;
 
   const handleAnalyze = async () => {
     if (!inputText.trim()) return;
+    setError(null);
     setIsAnalyzing(true);
 
     const analysisKey = detectedAnalysis;
@@ -165,7 +239,11 @@ User's dilemma: ${inputText.trim()}`,
             cost: (['low', 'medium', 'high'].includes(it.cost as string) ? it.cost : 'medium') as 'low' | 'medium' | 'high',
             risk: (['low', 'medium', 'high'].includes(it.risk as string) ? it.risk : 'medium') as 'low' | 'medium' | 'high',
             timeToImplement: String(it.timeToImplement || M.undefined_),
-            score: typeof it.score === 'number' ? it.score : 75,
+            // يُحصَر في 0..100: النموذج قد يُعيد 150 أو -5، وتُعرَض كما هي
+            // بجانب "/100" فتفقد الجدول معناه.
+            score: typeof it.score === 'number'
+              ? Math.max(0, Math.min(100, Math.round(it.score)))
+              : 75,
           })),
           recommendation: String(parsed.recommendation || parsed.items[0]?.name || ''),
           reasoning: String(parsed.reasoning || M.genReason),
@@ -176,19 +254,24 @@ User's dilemma: ${inputText.trim()}`,
     } catch (err) {
       console.warn('[DecisionMatrix] AI analysis failed, using local fallback:', err);
       // فشل AI (لا إنترنت/حصة) → التحليل المحلي البسيط كملاذ أخير
-      const items = inputText.split(/[,\nأو]|مقابل|ضد/).filter(s => s.trim().length > 2).slice(0, 4);
+      const items = inputText.split(SPLIT_OPTIONS).map(s => s.trim()).filter(s => s.length > 2).slice(0, 4);
       if (items.length >= 2) {
         setResult({
           title: M.genTitle,
           items: items.map((item, idx) => ({
-            name: item.trim(), emoji: ['⭐', '🔷', '🔶', '💎'][idx] || '📌',
+            name: item, emoji: ['⭐', '🔷', '🔶', '💎'][idx] || '📌',
             pros: [M.genPro(1), M.genPro(2)], cons: [M.genCon(1), M.genCon(2)],
             cost: (['low', 'medium', 'high'] as const)[idx % 3], risk: (['low', 'medium'] as const)[idx % 2],
             timeToImplement: M.undefined_, score: 75 - idx * 5
           })),
-          recommendation: items[0].trim(),
+          recommendation: items[0],
           reasoning: M.genReason
         });
+      } else {
+        // لا تحليل من الـAI، ولا خيارين يمكن استخراجهما. كان هذا الفرع
+        // صامتاً تماماً — والصمت هنا أسوأ من الخطأ: المستخدم لا يعرف
+        // أعطِب التطبيق أم أخطأ هو في الصياغة.
+        setError(`${M.failed} ${M.needTwo}`);
       }
     } finally {
       setIsAnalyzing(false);
@@ -261,6 +344,7 @@ ${i.cons.map(c => `- ${c}`).join('\n')}
             </div>
           </div>
           <ListenButton style="confident" darkMode={darkMode} className="me-1" label="استمع للمحتوى" />
+          <VoicePicker variant="bar" darkMode className="me-1" />
           <button
             onClick={onClose}
             className="relative z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white backdrop-blur-md border border-white/20 hover:rotate-90 transition-all duration-300 shadow-lg"
@@ -319,6 +403,19 @@ ${i.cons.map(c => `- ${c}`).join('\n')}
                   <><span>🧩</span><span>{M.solve}</span></>
                 )}
               </button>
+
+              {error && (
+                <div
+                  role="alert"
+                  className={`mt-3 rounded-xl border px-3 py-2.5 text-sm ${
+                    darkMode
+                      ? 'border-red-500/40 bg-red-500/10 text-red-300'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  ⚠️ {error}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-6 animate-fade-in-up">

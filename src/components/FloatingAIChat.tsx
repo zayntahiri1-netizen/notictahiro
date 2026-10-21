@@ -11,11 +11,68 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { geminiChat, geminiTranscribeAudio, type GeminiMessage } from '../utils/geminiService';
+import { geminiChat, geminiTranscribeAudio, geminiExtractAction, type GeminiMessage } from '../utils/geminiService';
+
+/**
+ * هل يبدو أن المستخدم طلب إنشاء/حفظ شيء؟
+ *
+ * بوّابة رخيصة قبل النداء الثاني (شبكة الأمان): بلاها نُنفق نداءً إضافياً
+ * على كل سؤال عادي. والخطأ هنا رخيص في اتجاه واحد فقط — مطابقة زائدة
+ * تُكلّف نداءً يُعيد {"action":"none"}، أما مطابقة ناقصة فتُعيد المستخدم
+ * إلى تكرار طلبه. لذلك هي واسعة عمداً.
+ */
+const CREATE_INTENT = new RegExp(
+  [
+    'ضف|أضف|اضف|زيد|سجّل|سجل|دوّن|دون|أنشئ|انشئ|اكتب لي|حطّ|حط|خلّي|خلي|صاوب',
+    'add|create|save|record|log|note down|write me|make a note|jot',
+    'añade|agrega|crea|guarda|anota|registra|apunta',
+    '添加|创建|保存|记录|写一个|新建',
+  ].join('|'),
+  'i',
+);
 import { generateProactiveInsights, type ProactiveInsight } from '../utils/proactiveInsights';
 import { CaretSafeInput } from './CaretSafe';
 import { useBannerHeight } from './AdBanner';
 import ListenButton from './ListenButton';
+import MarkdownView from './MarkdownView';
+import VoicePicker from './VoicePicker';
+
+/**
+ * أسئلة تحتاج معطيات حيّة.
+ *
+ * ─── لماذا هذا موجود ───
+ * المقارنة التي عقدها المستخدم بين هذا التطبيق وتطبيق Gemini كشفت أن
+ * الفرق لم يكن في ذكاء النموذج: جواب Gemini يحمل مصادر (صحف، وكالات)،
+ * أي أنه بحث. وهذا التطبيق كان يجيب من ذاكرة التدريب لأن البحث مطفأ
+ * افتراضياً — فيخرج جوابٌ واثقٌ عن انتخابات أو أسعار بمعلومات قديمة.
+ *
+ * والبحث لا يُشعَل دائماً بلا تمييز: يستهلك حصّة أعلى ويُبطئ الردّ،
+ * ولا معنى له في «لخّص ملاحظاتي» أو «اكتب لي رسالة». فالقاعدة: يُشعَل
+ * حين يسأل المستخدم عن شيء يتغيّر بمرور الوقت.
+ */
+const LIVE_DATA_INTENT = new RegExp(
+  [
+    // عربية — أحداث ووقائع متغيّرة
+    'آخر|أحدث|حالي|حاليا|الآن|اليوم|البارح|غدا|مؤخرا|جديد',
+    'خبر|أخبار|سعر|أسعار|ثمن|تكلفة|كم يساوي|صرف|بورصة|عملة',
+    'انتخاب|نتيجة|نتائج|مباراة|مباريات|الطقس|حالة الطقس',
+    'من هو|من هي|شكون|من فاز|الرئيس|الوزير|الحكومة|قانون جديد',
+    // إنجليزية
+    'latest|current|today|now|recent|news|price|cost|rate|weather',
+    'who is|who won|score|election|stock|exchange rate|this year',
+    // إسبانية / صينية
+    'último|actual|hoy|ahora|noticias|precio|elecciones',
+    '最新|现在|今天|新闻|价格|选举',
+  ].join('|'),
+  'i',
+);
+
+/** سنة صريحة قريبة (2024 فما فوق) علامةٌ قويّة على سؤال عن الواقع الآن. */
+const YEAR_HINT = /\b20(2[4-9]|[3-9]\d)\b/;
+
+function needsLiveData(msg: string): boolean {
+  return LIVE_DATA_INTENT.test(msg) || YEAR_HINT.test(msg);
+}
 
 interface ChatMsg {
   role: 'user' | 'model';
@@ -23,7 +80,7 @@ interface ChatMsg {
 }
 
 export default function FloatingAIChat() {
-  const { darkMode, notes, debtsCredits, transactions, language, addNote, addProject, projects, addDebtCredit, addTransaction } = useApp();
+  const { darkMode, notes, debtsCredits, transactions, language, addNote, addProject, projects, addDebtCredit, addTransaction, ensureProjectByName } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
   // ارتفاع البانر كحالة React (وليس متغيّر CSS): يضمن إعادة الرسم فور
@@ -32,7 +89,10 @@ export default function FloatingAIChat() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [searchEnabled, setSearchEnabled] = useState(false);
+  // ⚠️ مُشعَل افتراضياً. كان مطفأً، وهو السبب الحقيقي في أن الإجابات
+  // بدت «ضعيفة» مقارنةً بتطبيق Gemini: ذاك يبحث دائماً، وهذا لم يكن
+  // يبحث إلا بضغطة لا يعرفها المستخدم. ويبقى الزرّ متاحاً لإطفائه.
+  const [searchEnabled, setSearchEnabled] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -150,6 +210,20 @@ export default function FloatingAIChat() {
   // ─── بناء السياق الغني ────────────────────────────────────────────
   const buildContext = useCallback((): string => {
     const parts: string[] = [];
+
+    // ⚠️ المشاريع كانت غائبة عن السياق تماماً رغم أنها مُستخرَجة أعلاه.
+    // فكان الـAI يُطلب منه «ضَع الملاحظة في مشروع الموضوع إن وُجد» وهو لا
+    // يرى أي مشروع أصلاً — فيستحيل الطلب تقنياً لا سلوكياً.
+    // نرسل الأسماء فقط لا المعرّفات: المعرّف الذي يخترعه النموذج يُنتج
+    // ملاحظة تشير إلى مشروع غير موجود، والاسم يُحلّ في الكود بأمان.
+    if (projects?.length) {
+      parts.push(`## PROJECTS (${projects.length}) — use the EXACT name in "projectName"`);
+      projects.forEach(p => {
+        parts.push(`- "${p.name}"${p.description ? ` — ${p.description}` : ''}`);
+      });
+      parts.push('');
+    }
+
     const openNotes = notes.filter(n => !n.isLocked);
     if (openNotes.length > 0) {
       parts.push(`## NOTES & IDEAS (${openNotes.length} total)`);
@@ -175,7 +249,7 @@ export default function FloatingAIChat() {
       });
     }
     return parts.join('\n') || 'No data yet.';
-  }, [notes, debtsCredits, transactions]);
+  }, [notes, debtsCredits, transactions, projects]);
 
   // ─── تنفيذ الإجراءات التي يطلبها الـ AI (إنشاء ملاحظات/أفكار/مشاريع) ──
   // الـ AI يُرسل كتلة ```tahiro-action تحتوي JSON — نستخرجها وننفّذها فعلياً،
@@ -191,7 +265,7 @@ export default function FloatingAIChat() {
           debt: '💸 债务（你欠）', credit: '💰 债权（欠你）', txn: '🧾 交易', confirmAsk: '确认添加？', confirm: '确认', cancel: '取消', added: '✅ 已添加', cancelled: '❌ 已取消' },
   }[(language as 'ar' | 'en' | 'es' | 'zh')] ?? { note: 'Note created', idea: 'Idea created', project: 'Project created', debt: 'Debt', credit: 'Credit', txn: 'Transaction', confirmAsk: 'Confirm?', confirm: 'Confirm', cancel: 'Cancel', added: 'Added', cancelled: 'Cancelled' };
 
-  const processActions = useCallback((rawReply: string): string => {
+  const processActions = useCallback((rawReply: string): { text: string; handled: boolean } => {
     const actionRegex = /```tahiro-action\s*([\s\S]*?)```/g;
     let cleaned = rawReply;
     let match: RegExpExecArray | null;
@@ -204,15 +278,28 @@ export default function FloatingAIChat() {
         if (data.action === 'create_note') {
           // الملاحظات/الأفكار تُنشأ فوراً (غير حسّاسة)
           const noteType = data.type === 'idea' ? 'idea' : 'note';
+
+          // ⚠️ المشروع يُحلّ بالاسم لا بالمعرّف.
+          // كان السطر السابق `projectId: data.projectId ?? null` — والنموذج
+          // لا يملك معرّفات حقيقية، فإمّا أن يتركه فارغاً (فلا تُصنَّف
+          // الملاحظة أبداً) أو يخترع معرّفاً يشير إلى لا شيء. وهنا
+          // ensureProjectByName يُعيد معرّف المشروع الموجود بالاسم نفسه،
+          // أو يُنشئه ويُعيد معرّفه — فتُصنَّف الملاحظة من أول أمر.
+          const wantedProject = String(data.projectName || data.project || '').trim();
+          const projectId = wantedProject ? ensureProjectByName(wantedProject) : null;
+
           addNote({
             title: data.title || (noteType === 'idea' ? 'فكرة' : 'ملاحظة'),
             content: data.content || '',
             type: noteType,
             tags: Array.isArray(data.tags) ? data.tags : [],
-            projectId: data.projectId ?? null,
+            projectId: projectId || null,
             isPinned: false,
           } as Parameters<typeof addNote>[0]);
-          confirmations.push(`✅ ${noteType === 'idea' ? ACTION_LABELS.idea : ACTION_LABELS.note}: "${data.title}"`);
+          confirmations.push(
+            `✅ ${noteType === 'idea' ? ACTION_LABELS.idea : ACTION_LABELS.note}: "${data.title}"` +
+            (wantedProject ? ` — 📁 ${wantedProject}` : '')
+          );
         } else if (data.action === 'create_project') {
           addProject({
             name: data.name || 'مشروع',
@@ -273,8 +360,9 @@ export default function FloatingAIChat() {
     if (confirmations.length) cleaned += (cleaned ? '\n\n' : '') + confirmations.join('\n');
     // الإجراءات الحسّاسة (دين/معاملة) تُخزَّن لعرض أزرار التأكيد
     if (newPending.length) setPendingActions(prev => [...prev, ...newPending]);
-    return cleaned;
-  }, [addNote, addProject, addDebtCredit, addTransaction, ACTION_LABELS]);
+    // `handled` تُخبر المستدعي هل نُفِّذ شيء فعلاً — عليها تقوم شبكة الأمان
+    return { text: cleaned, handled: confirmations.length + newPending.length > 0 };
+  }, [addNote, addProject, addDebtCredit, addTransaction, ensureProjectByName, ACTION_LABELS]);
 
   // تأكيد إجراء معلّق (دين/معاملة) → ينفّذه فعلياً ويزيله من القائمة
   const confirmAction = (id: string) => {
@@ -363,8 +451,32 @@ export default function FloatingAIChat() {
     setMessages(newMsgs);
     try {
       const history: GeminiMessage[] = messages.map(m => ({ role: m.role, content: m.content }));
-      const reply = await geminiChat(userMsg, history, buildContext(), { enableSearch: searchEnabled });
-      const finalReply = processActions(reply);
+      // البحث: باختيار المستخدم، أو تلقائياً حين يسأل عن شيء يتغيّر
+      // بمرور الوقت — فلا يُطفئه عن غير قصد ثم يتلقّى خبراً قديماً.
+      const useSearch = searchEnabled || needsLiveData(userMsg);
+      const reply = await geminiChat(userMsg, history, buildContext(), { enableSearch: useSearch });
+      const first = processActions(reply);
+      let finalReply = first.text;
+
+      // ─── شبكة الأمان ────────────────────────────────────────────────
+      // طلب المستخدم إنشاء شيء، لكن النموذج لم يُصدر كتلة إجراء. بدل أن
+      // نترك المستخدم يكتشف ذلك بنفسه ويُعيد الطلب، نستخرج الإجراء بنداء
+      // ثانٍ صارم وننفّذه الآن — فيبقى «أمر واحد = نتيجة واحدة».
+      if (!first.handled && CREATE_INTENT.test(userMsg)) {
+        try {
+          const recovered = await geminiExtractAction(userMsg, reply);
+          if (recovered) {
+            const second = processActions('```tahiro-action\n' + recovered + '\n```');
+            if (second.handled && second.text) {
+              finalReply = finalReply ? `${finalReply}\n\n${second.text}` : second.text;
+            }
+          }
+        } catch {
+          // فشل الاستخراج — نُبقي الردّ الأصلي كما هو ولا نُظهر خطأً:
+          // المستخدم حصل على جواب، وغياب الإجراء سيظهر بغياب التأكيد.
+        }
+      }
+
       setMessages([...newMsgs, { role: 'model', content: finalReply }]);
     } catch {
       setMessages([...newMsgs, { role: 'model', content: S.err }]);
@@ -448,9 +560,19 @@ export default function FloatingAIChat() {
               <span className="font-bold">{S.title}</span>
             </div>
             <div className="flex items-center gap-1">
-              {/* استماع لآخر رد من المساعد */}
-              <ListenButton size="sm" style="exciting" darkMode label="استمع لآخر رد"
-                text={() => [...messages].reverse().find(m => m.role === 'model')?.content ?? ''} />
+              {/* ⚠️ الزرّ العلوي يقرأ **الحوار كلّه** لا آخر ردّ فقط.
+                  كان يقرأ آخر ردّ، وهو ما يجعله نسخةً باهتة من الزرّ
+                  الذي تحت كل ردّ. القراءة الكاملة هي ما لا يملكه غيره:
+                  مراجعة محادثة طويلة بلا قراءة بالعين. والأدوار تُسمّى
+                  («أنت» / «طاهيرو») وإلا التبست الأصوات على المستمع. */}
+              <ListenButton
+                size="sm" style="exciting" darkMode label="استمع للحوار كامل"
+                text={() => messages
+                  .filter(m => m.content.trim())
+                  .map(m => `${m.role === 'user' ? 'أنت' : 'طاهيرو'}: ${m.content}`)
+                  .join('\n\n')}
+              />
+              <VoicePicker variant="bar" darkMode />
               {/* زر تبديل بحث الإنترنت */}
               <button
                 onClick={() => setSearchEnabled(p => !p)}
@@ -519,7 +641,16 @@ export default function FloatingAIChat() {
                   ${m.role === 'user'
                     ? 'bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white'
                     : darkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-800'}`}>
-                  {renderContent(m.content)}
+                  {/* ⚠️ ردود الـAI عبر MarkdownView لا عبر renderContent.
+                      renderContent كان يدعم **عريض** فقط — فكان كل ما عداه
+                      يظهر خاماً: ### و* و--- و`code` و[[روابط]]. وهو سبب
+                      «شكل الإجابات التقليدي»: الجواب كان منسَّقاً فعلاً،
+                      لكن التنسيق لم يكن يُعرض.
+                      ورسائل المستخدم تبقى نصّاً صِرفاً: هو كتبها، فلا معنى
+                      لتأويل رموزه، ولا داعي لتوسيع سطح العرض بلا سبب. */}
+                  {m.role === 'model'
+                    ? <MarkdownView source={m.content} darkMode={darkMode} compact />
+                    : renderContent(m.content)}
                 </div>
                 {/* استماع فوري لهذا الرد تحديداً — بضغطة واحدة فور ظهوره.
                     نمرّر نص الرسالة صراحةً (لا استخراجاً من النافذة) حتى
@@ -543,11 +674,22 @@ export default function FloatingAIChat() {
               </div>
             )}
 
-            {/* بطاقات تأكيد الإجراءات المعلّقة (دين/معاملة) */}
+            {/* ─── بطاقات تأكيد الإجراءات المعلّقة (دين/معاملة) ──────────
+                ⚠️ لاصقة في أسفل منطقة التمرير عمداً.
+                كانت تُلحق في ذيل قائمة الرسائل، فإن جاءت بعد ردّ طويل
+                خرجت عن الشاشة — فيظنّ المستخدم أن الأمر نُفِّذ وهو ينتظر
+                ضغطةً لا يراها. وبقاء التأكيد للديون بلا رؤيته هو أسوأ
+                الاحتمالين: لا حماية ولا تنفيذ. */}
             {pendingActions.map(action => (
-              <div key={action.id} className={`rounded-2xl border p-3 ${darkMode ? 'bg-gray-800/60 border-violet-500/40' : 'bg-violet-50 border-violet-200'}`}>
+              <div key={action.id} className={`sticky bottom-0 z-10 rounded-2xl border-2 p-3 shadow-lg ring-2 ring-amber-400/30 ${darkMode ? 'bg-gray-900 border-amber-500/60' : 'bg-amber-50 border-amber-300'}`}>
+                <div className={`mb-1.5 flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                  </span>
+                  {ACTION_LABELS.confirmAsk}
+                </div>
                 <div className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>{action.label}</div>
-                <div className={`text-xs mb-2.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{ACTION_LABELS.confirmAsk}</div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => confirmAction(action.id)}

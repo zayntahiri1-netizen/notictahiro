@@ -9,6 +9,7 @@ import { showPrivacyOptions, getAdDiagnostics } from '../utils/admob';
 import { getStorageUsage, formatBytes } from '../utils/storageHealth';
 import { getLastBackupTime, isBackupDurable, runAutoBackupIfDue } from '../utils/autoBackup';
 import ErrorLogModal from './ErrorLogModal';
+import VoicePicker from './VoicePicker';
 import RestoreBackupModal from './RestoreBackupModal';
 import CloudSyncModal from './CloudSyncModal';
 import { isSyncConfigured } from '../utils/cloudSync';
@@ -534,6 +535,24 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
 
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
 
+                {/* اختيار الصوت — هنا لأنه الموضع الوحيد الذي يُبلَغ من
+                    كل نافذة في التطبيق. والاختيار واحد مشترك، فتغييره
+                    هنا يسري على كل أزرار الاستماع فوراً. */}
+                <div className={`mb-3 flex items-center justify-between gap-2 rounded-2xl px-3 py-2.5 ${
+                  darkMode ? 'bg-gray-900' : 'bg-white shadow-sm'
+                }`}>
+                  <span className="min-w-0">
+                    <span className={`block text-[11px] font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      🎙️ صوت القارئ
+                    </span>
+                    <span className={`block truncate text-[10px] ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      يسري على كل نوافذ التطبيق
+                    </span>
+                  </span>
+                  <VoicePicker variant="plain" darkMode={darkMode} />
+                </div>
+
+
               <div className={`mb-2 rounded-2xl border p-2 ${darkMode ? 'border-gray-800 bg-gray-900/60' : 'border-gray-200 bg-white shadow-sm'}`}>
                 <div className="mb-1.5 flex items-center justify-between">
                   <div>
@@ -584,7 +603,7 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                   onContextMenu={(e) => { e.preventDefault(); openOver(() => setShowErrLog(true)); }}
                   title="اضغط: حالة الإعلانات · ضغطة مطوّلة: سجل الأخطاء"
                   className={`mt-1.5 w-full text-center text-[9px] font-bold ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}
-                >v1.9.13 · DIAG</button>
+                >v1.9.19 · DIAG</button>
 
                 {/* مؤشر سعة التخزين — أخضر/كهرماني/أحمر حسب الامتلاء */}
                 <div className="mt-2">

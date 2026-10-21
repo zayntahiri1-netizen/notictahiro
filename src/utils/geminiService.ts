@@ -414,6 +414,78 @@ export async function geminiChat(
   );
 }
 
+/**
+ * شبكة أمان: تستخرج إجراءً واحداً من طلب المستخدم حين ينسى نموذج
+ * الدردشة إصدار كتلة `tahiro-action`.
+ *
+ * ─── لماذا هذه الدالة موجودة ───
+ * محادثة الدردشة تعمل بحرارة 0.85 — وهي حرارة كتابة لا حرارة بروتوكول.
+ * فيقع أحد أمرين حين يُطلب إنشاء ملاحظة:
+ *   • يردّ النموذج نصّاً بلا كتلة إجراء      → لا شيء يُنشأ، بلا تفسير.
+ *   • أو — وهو الأسوأ — يكتب «تمت إضافة الملاحظة» بلغته الطبيعية بلا
+ *     كتلة. فيرى المستخدم تأكيداً ولا يجد شيئاً. وهذا كذبٌ عرضيّ لا
+ *     يكتشفه إلا من يذهب ليتحقّق بنفسه.
+ * وفي الحالتين كان الحلّ الوحيد أن يُعيد المستخدم الطلب — وهو بالضبط ما
+ * لا يجب أن يُطلب منه.
+ *
+ * هنا نداء ثانٍ ضيّق: نموذج أخفّ، حرارة 0.1، وضع JSON، ومهمّة واحدة لا
+ * محادثة. فيصير «أمر واحد = نتيجة واحدة» مضموناً في الكود لا مأمولاً من
+ * النموذج.
+ *
+ * تُعيد نصّ JSON للإجراء، أو null إن لم يكن في الطلب إنشاء أصلاً.
+ */
+export async function geminiExtractAction(
+  userMessage: string,
+  assistantReply: string,
+): Promise<string | null> {
+  const today = new Date().toISOString().split('T')[0];
+  const raw = await callGemini(
+    `You are an intent extractor, not a chat assistant. Decide whether the USER asked to CREATE/SAVE something in their app.
+
+USER MESSAGE:
+${userMessage.slice(0, 1200)}
+
+ASSISTANT'S REPLY (may contain the content the user wanted saved):
+${assistantReply.slice(0, 2500)}
+
+Respond with ONE JSON object and nothing else.
+
+If the user did NOT ask to create/save anything, respond exactly: {"action":"none"}
+
+Otherwise respond with exactly one of:
+{"action":"create_note","type":"note","title":"...","content":"...","tags":["..."],"projectName":"..."}
+{"action":"create_project","name":"...","description":"..."}
+{"action":"create_debt","type":"debt","personName":"...","amount":0,"currency":"MAD","description":"...","dueDate":"YYYY-MM-DD"}
+{"action":"create_transaction","amount":0,"currency":"MAD","category":"other","description":"..."}
+
+Rules:
+- "type" for notes is "note" or "idea".
+- "projectName" is the topic/category this note belongs to, in the user's language. Omit it only if the note fits no topic.
+- "content" must be the FULL ready content — take it from the assistant's reply when the reply contains it.
+- For debts: "debt" = the user owes; "credit" = someone owes the user.
+- category must be one of: investment, food, transport, shopping, other.
+- Today is ${today}.
+- Never invent amounts, names or dates the user did not give.`,
+    {
+      maxTokens: 2048,
+      temperature: 0.1,
+      jsonMode: true,
+      model: 'gemini-3.1-flash-lite',
+      functionName: 'extract-action',
+    },
+  );
+
+  const cleaned = raw.replace(/```json|```/g, '').trim();
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.action || parsed.action === 'none') return null;
+    return JSON.stringify(parsed);
+  } catch {
+    return null; // ردّ غير صالح — نتجاهله بصمت ولا نُفسد الردّ الأصلي
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // ميزات الذكاء الاصطناعي الإضافية
 // ═══════════════════════════════════════════════════════════════════════
@@ -591,9 +663,14 @@ export async function geminiTextToSpeech(
   const ANON_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
   const APP_TOKEN = import.meta.env.VITE_APP_TOKEN ?? '';
 
-  // النبرة الحماسية: نوجّه النموذج بأسلوب القراءة قبل النص الفعلي
-  const style = opts?.style ?? 'بنبرة حماسية ودافئة ومحفّزة، كأنك مدرّب ملهم';
-  const voiceName = opts?.voiceName ?? 'Puck'; // Puck صوت حيوي مناسب للحماس
+  // ⚠️ الأسلوب يُرسل في حقله الخاصّ، ولا يُدمج في النصّ أبداً.
+  //
+  // كان السطر السابق يبني: `اقرأ ما يلي ${style}: ${text}` — ونموذج TTS
+  // يعامل النصّ المُرسَل كنصّ حرفي، فكان ينطق التعليمة نفسها بصوت عالٍ
+  // قبل الملاحظة: «اقرأ ما يلي بنبرة حماسية ودافئة…». التوجيه لم يكن
+  // يُطبَّق، كان يُقرأ.
+  const style = (opts?.style ?? 'حماسي ودافئ ومحفّز').slice(0, 120);
+  const voiceName = opts?.voiceName ?? 'Gacrux'; // موصوف رسمياً بـ Mature
 
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 45_000);
@@ -610,7 +687,9 @@ export async function geminiTextToSpeech(
         ...(APP_TOKEN ? { 'x-app-token': APP_TOKEN } : {}),
       },
       body: JSON.stringify({
-        prompt: `اقرأ ما يلي ${style}: ${text}`,
+        // النصّ وحده — بلا أي توجيه، وإلا نُطق التوجيه.
+        prompt: text,
+        style,
         ttsMode: true,
         voiceName,
         functionName: 'text-to-speech',

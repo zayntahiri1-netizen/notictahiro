@@ -238,6 +238,7 @@ interface AppContextType {
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'noteCount'>) => void;
   /** يُنشئ مشروع "النسخ" إن لم يكن موجوداً، ويُعيد معرّفه دائماً. */
   ensureSharedProject: () => string;
+  ensureProjectByName: (name: string, color?: string) => string;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   
@@ -517,6 +518,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return SHARED_PROJECT_ID;
   };
 
+  /**
+   * يضمن وجود مشروع بالاسم المعطى ويُعيد معرّفه فوراً.
+   *
+   * الحاجة إليه: الـAI لا يملك معرّفات المشاريع — يرسل اسماً فقط. ولو
+   * أسندنا الاسم كما هو إلى note.projectId لأشار إلى مشروع غير موجود،
+   * فتضيع الملاحظة من كل عرض بلا خطأ.
+   *
+   * ⚠️ لماذا المعرّف يُعاد فوراً لا بعد إعادة التصيير: المستدعي يُنشئ
+   * الملاحظة في نفس اللحظة ويحتاج المعرّف الآن. وانتظار الحالة يعني
+   * ملاحظة بلا مشروع.
+   *
+   * ⚠️ ولماذا سجلّ pending: الـAI قد يُصدر ملاحظتين لمشروع جديد واحد في
+   * ردّ واحد. فالنداء الثاني يقع قبل أن تُحدَّث `projects`، ولولا السجلّ
+   * لأُنشئ المشروع مرتين بمعرّفين — ولتفرّقت ملاحظتان كان يجب أن تجتمعا.
+   *
+   * والتحقّق داخل المُحدِّث يستعمل المعرّف لا الاسم عمداً: لو تحقّقنا
+   * بالاسم وتبيّن أنه موجود بمعرّف آخر، لكنّا قد أعدنا معرّفاً لا وجود
+   * له أصلاً — وهو بالضبط العطب الذي يمنعه هذا كلّه.
+   */
+  const pendingProjectIds = useRef<Map<string, string>>(new Map());
+
+  const ensureProjectByName = (rawName: string, color?: string): string => {
+    const name = rawName.trim();
+    if (!name) return '';
+    const key = name.toLowerCase();
+
+    const existing = projects.find(p => p.name.trim().toLowerCase() === key);
+    if (existing) return existing.id;
+
+    const alreadyQueued = pendingProjectIds.current.get(key);
+    if (alreadyQueued) return alreadyQueued;
+
+    const id = uniqueId();
+    pendingProjectIds.current.set(key, id);
+
+    setProjects(prev => {
+      if (prev.some(p => p.id === id)) return prev;
+      return [...prev, {
+        id,
+        name,
+        description: '',
+        color: color || '#7c3aed',
+        noteCount: 0,
+        createdAt: new Date().toISOString(),
+      }];
+    });
+
+    return id;
+  };
+
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(project => 
       project.id === id ? { ...project, ...updates } : project
@@ -727,6 +778,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       togglePin,
       addProject,
       ensureSharedProject,
+      ensureProjectByName,
       updateProject,
       deleteProject,
       addTransaction,
