@@ -603,7 +603,7 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                   onContextMenu={(e) => { e.preventDefault(); openOver(() => setShowErrLog(true)); }}
                   title="اضغط: حالة الإعلانات · ضغطة مطوّلة: سجل الأخطاء"
                   className={`mt-1.5 w-full text-center text-[9px] font-bold ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}
-                >v1.9.19 · DIAG</button>
+                >v1.9.20 · DIAG</button>
 
                 {/* مؤشر سعة التخزين — أخضر/كهرماني/أحمر حسب الامتلاء */}
                 <div className="mt-2">
