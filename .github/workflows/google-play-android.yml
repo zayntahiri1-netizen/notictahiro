@@ -315,6 +315,16 @@ jobs:
           sys.exit(1) if fail else print("✅ كل متطلبات العتاد اختيارية — لا حجب عند التنزيل")
           PY
 
+      # ── تفعيل R8: تقليص وتحسين وتعتيم رمز DEX ─────────────────────
+      # لوحة Play: «تحسين رمز DEX منخفضة» — R8 مُطفأ، وحجم DEX غير
+      # المضغوط 18.4MB (فوق عتبة التنبيه). التأثير في نسخة الإصدار
+      # وحدها، ولذلك يليه فحصٌ يُثبت نجاة الإضافات فعلياً.
+      - name: Enable R8 (DEX optimization)
+        env:
+          # مفتاح إطفاء بلا تعديل كود: Settings → Variables → DISABLE_R8=1
+          DISABLE_R8: ${{ vars.DISABLE_R8 }}
+        run: bash android-patches/apply-r8.sh
+
       # ✅ versionCode تلقائي — كل build له رقم أعلى (متطلب Play Store الصارم)
       - name: Auto-increment versionCode
         run: |
@@ -391,6 +401,55 @@ jobs:
             -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}" \
             --no-daemon
+
+      # ── التحقّق من أن R8 لم يكسر الإضافات ──────────────────────────
+      # ⚠️ هذه الخطوة هي ما يجعل تفعيل R8 آمناً، وبدونها لا يجوز تفعيله.
+      #
+      # Capacitor يُحمّل كل إضافة بـ Class.forName باسمها النصّي من
+      # capacitor.plugins.json. فإن أعاد R8 تسمية الصنف، يبقى البناء
+      # ناجحاً وتسقط الإضافة عند المستخدم وحده: الإعلانات تختفي، والصوت
+      # يصمت، والملفات لا تُحفظ — بلا رسالة خطأ واحدة.
+      #
+      # وملف DEX يخزّن أسماء الأصناف كسلاسل بصيغة Lcom/foo/Bar;، فوجود
+      # السلسلة دليلٌ مباشر على أن الاسم لم يُمسّ. نفحص الحزمة الناتجة
+      # فعلياً، لا الإعدادات التي طلبناها.
+      - name: Verify R8 kept all Capacitor plugins
+        run: |
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          PLUGINS=android/app/src/main/assets/capacitor.plugins.json
+          [ -f "$PLUGINS" ] || { echo "::error::$PLUGINS غير موجود"; exit 1; }
+          python3 - "$APK" "$PLUGINS" <<'PY'
+          import json, re, sys, zipfile
+
+          apk, plugins_json = sys.argv[1], sys.argv[2]
+          classpaths = [p['classpath'] for p in json.load(open(plugins_json, encoding='utf-8'))
+                        if p.get('classpath')]
+          if not classpaths:
+              print('::error::capacitor.plugins.json فارغ — لا إضافات لفحصها')
+              sys.exit(1)
+
+          blob = b''
+          with zipfile.ZipFile(apk) as z:
+              dex = [n for n in z.namelist() if re.fullmatch(r'classes\d*\.dex', n)]
+              if not dex:
+                  print('::error::لا ملفات DEX داخل الحزمة')
+                  sys.exit(1)
+              for n in dex:
+                  blob += z.read(n)
+
+          print(f'🔍 {len(dex)} ملف DEX · {len(blob)//1048576} ميغابايت · {len(classpaths)} إضافة')
+
+          missing = [cp for cp in classpaths
+                     if ('L' + cp.replace('.', '/') + ';').encode() not in blob]
+          for cp in classpaths:
+              print(('  ❌ ' if cp in missing else '  ✅ ') + cp)
+
+          if missing:
+              print(f'::error::{len(missing)} إضافة اختفت من DEX بعد R8 — '
+                    'ستفشل Class.forName عند المستخدم. راجع proguard-notic.pro')
+              sys.exit(1)
+          print(f'✅ كل الإضافات ({len(classpaths)}) نجت من R8 بأسمائها الأصلية')
+          PY
 
       # ── 3. Release AAB (للـ Play Store) ─────────────────
       - name: Build release AAB
