@@ -79,10 +79,22 @@
 -renamesourcefileattribute SourceFile
 
 
-# ─── 7. أصناف التطبيق الأصلية المعلَنة في AndroidManifest ─────────────
-# (الفقاعة العائمة، أداة الشاشة الرئيسية، استقبال المشاركة)
-# R8 يُبقي تلقائياً ما يُذكَر في البيان المدموج، فلا قاعدة لازمة هنا —
-# والتحقّق في CI يتأكّد من ذلك فعلياً بدل الاكتفاء بالافتراض.
+# ─── 7. أصناف التطبيق الأصلية ─────────────────────────────────────────
+#
+# BubbleOverlayPlugin إضافة Capacitor مكتوبة داخل هذا التطبيق، لا من
+# npm — فهي **ليست** في capacitor.plugins.json، ولا يراها الفحص الذي
+# يقرأ ذلك الملف. القاعدتان (2) تغطّيانها نظرياً (@CapacitorPlugin
+# و extends Plugin)، لكن اسمها يُذكر صراحةً هنا لأن اعتماد ميزةٍ كاملة
+# على استنتاجٍ غير مرئي ليس أماناً.
+#
+# والثلاثة الأخرى (خدمة الفقاعة، مستقبِل الإقلاع، مزوّد الأداة) معلَنة
+# في AndroidManifest، و R8 يُبقي ما في البيان تلقائياً. نُثبّتها هنا
+# أيضاً: التكلفة بضعة كيلوبايت، والبديل خدمةٌ تختفي بصمت عند التحديث.
+-keep class com.notictahiro.app.BubbleOverlayPlugin { *; }
+-keep class com.notictahiro.app.BubbleService { *; }
+-keep class com.notictahiro.app.BubbleBootReceiver { *; }
+-keep class com.notictahiro.app.NoticWidgetProvider { *; }
+-keep class com.notictahiro.app.MainActivity { *; }
 
 
 # ─── 8. تحذيرات غير مؤذية ─────────────────────────────────────────────

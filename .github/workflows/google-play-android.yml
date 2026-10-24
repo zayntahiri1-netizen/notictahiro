@@ -428,6 +428,18 @@ jobs:
               print('::error::capacitor.plugins.json فارغ — لا إضافات لفحصها')
               sys.exit(1)
 
+          # ⚠️ أصناف هذا التطبيق الأصلية — ليست في capacitor.plugins.json.
+          # BubbleOverlayPlugin إضافة مكتوبة هنا لا من npm، والثلاثة
+          # الباقية خدمات ومستقبِلات معلَنة في البيان. فحصٌ يقرأ ملف
+          # الإضافات وحده يتركها خارج التغطية — وهي نصف الميزات الأصلية.
+          classpaths += [
+              'com.notictahiro.app.BubbleOverlayPlugin',
+              'com.notictahiro.app.BubbleService',
+              'com.notictahiro.app.BubbleBootReceiver',
+              'com.notictahiro.app.NoticWidgetProvider',
+              'com.notictahiro.app.MainActivity',
+          ]
+
           blob = b''
           with zipfile.ZipFile(apk) as z:
               dex = [n for n in z.namelist() if re.fullmatch(r'classes\d*\.dex', n)]
@@ -480,3 +492,19 @@ jobs:
         with:
           name: notictahiro-release-aab
           path: android/app/build/outputs/bundle/release/*.aab
+
+      # ── قياس نتائج R8 من الحزمة النهائية ──────────────────────────
+      # وثيقة Google لمعالجة «تحسين رموز DEX منخفض» تطلب فتح الحزمة في
+      # أداة تحليل APK داخل Android Studio. وهذا متعذّر هنا: البناء بلا
+      # واجهة، والعمل من Termux على هاتف. فنُعيد التحليل في السجلّ.
+      #
+      # والأهمّ أنّ r8.json يحمل — بنصّ الوثيقة — البيانات الوصفية
+      # الدقيقة التي تحتسب منها «مؤشرات Android الحيوية» النتيجة. فطبعُه
+      # يعني رؤية أرقام Play قبل الرفع لا بعد أسبوع من النشر.
+      #
+      # ⚠️ موضعها بعد الرفع عن قصد، وتنتهي بـexit 0 دائماً: خطوة قياس
+      #    لا يجوز أن تحجب ملفاتٍ بُنيت بنجاح.
+      - name: Measure DEX size and R8 results
+        run: |
+          AAB=$(ls android/app/build/outputs/bundle/release/*.aab 2>/dev/null | head -1)
+          bash android-patches/measure-dex.sh "$AAB"

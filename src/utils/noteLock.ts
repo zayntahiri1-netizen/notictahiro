@@ -28,7 +28,12 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function fromBase64(b64: string): Uint8Array {
+// نوع الإرجاع موصَّف بدقّة: Uint8Array<ArrayBuffer> لا Uint8Array المجرَّدة.
+// السبب: مكتبة TypeScript 6 ضيّقت BufferSource إلى ArrayBufferView<ArrayBuffer>،
+// فصارت Uint8Array<ArrayBufferLike> (وهي الافتراضية) مرفوضةً في crypto.subtle.
+// التوصيف يُمحى عند البناء — لا أثر له وقت التشغيل — ويُبقي الملف سليماً
+// تحت 5.9.3 الحالية وتحت 6.x معاً.
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 }
 

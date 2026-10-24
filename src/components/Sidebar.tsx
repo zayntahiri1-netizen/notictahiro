@@ -15,6 +15,7 @@ import CloudSyncModal from './CloudSyncModal';
 import { isSyncConfigured } from '../utils/cloudSync';
 import { isProactiveNotifyEnabled, setProactiveNotifyEnabled } from '../utils/proactiveNotify';
 import { getEntries } from '../utils/errorLog';
+import { APP_VERSION } from '../version';
 import { CaretSafeInput } from './CaretSafe';
 import {
   isBubbleSupported, checkBubblePermission, requestBubblePermission,
@@ -603,7 +604,7 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                   onContextMenu={(e) => { e.preventDefault(); openOver(() => setShowErrLog(true)); }}
                   title="اضغط: حالة الإعلانات · ضغطة مطوّلة: سجل الأخطاء"
                   className={`mt-1.5 w-full text-center text-[9px] font-bold ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}
-                >v1.9.22 · DIAG</button>
+                >v{APP_VERSION} · DIAG</button>
 
                 {/* مؤشر سعة التخزين — أخضر/كهرماني/أحمر حسب الامتلاء */}
                 <div className="mt-2">
@@ -845,7 +846,7 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
         isOpen={showErrLog}
         onClose={() => setShowErrLog(false)}
         darkMode={darkMode}
-        appVersion="1.9.11"
+        appVersion={APP_VERSION}
       />
 
       {/* تشخيص AdMob — يُفتح بالضغط على علامة الإصدار */}
