@@ -39,13 +39,20 @@ cp "$RULES_SRC" "$RULES_DST"
 echo "📄 نُسخت قواعد الإبقاء إلى $RULES_DST"
 
 python3 - "$GRADLE" <<'PY'
-import re, sys
+import os, re, sys
 
 path = sys.argv[1]
 src  = open(path, encoding='utf-8').read()
 
 # ── خروج مبكر: التعديل مطبَّق مسبقاً (السكربت يُعاد تشغيله في كل بناء)
-if 'proguard-notic.pro' in src and re.search(r'minifyEnabled\s+true', src):
+# ⚠️ الشرط يفحص التعديلات الثلاثة لا الأول وحده. فحصٌ ناقص هنا كان
+#    سيُخرج السكربت باكراً على ملفٍ فُعِّل فيه R8 وبقي -dontoptimize.
+shrink_ok = (os.environ.get('DISABLE_SHRINK_RES', '0') == '1'
+             or re.search(r'shrinkResources\s+true', src))
+if ('proguard-notic.pro' in src
+        and re.search(r'minifyEnabled\s+true', src)
+        and 'proguard-android.txt' not in src
+        and shrink_ok):
     print('✅ R8 مُفعَّل مسبقاً — لا تغيير')
     raise SystemExit(0)
 
@@ -94,9 +101,44 @@ if 'proguard-notic.pro' not in new_body:
                      "getDefaultProguardFile('proguard-android-optimize.txt'), "
                      "'proguard-rules.pro', 'proguard-notic.pro'\n        ")
 
+# ── أخطر سطر في هذا الملف: استبدال ملف القواعد الافتراضي ──────────────
+#
+# قالب Capacitor يولّد: getDefaultProguardFile('proguard-android.txt')
+# وأوّل سطر داخل ذلك الملف هو -dontoptimize — فيُعطّل مرحلة التحسين في
+# R8 كلّها، ويبقى التقليص والتعتيم وحدهما. ولهذا كانت Play تقول
+# «ميزة التحسين غير مفعَّلة» رغم أن R8 يعمل.
+#
+# و proguard-android-optimize.txt هو الملف نفسه حرفاً بحرف، ناقصاً
+# -dontoptimize. فالاستبدال لا يُضيف قاعدةً ولا يحذف حمايةً — يرفع
+# المنع فحسب.
+#
+# ⚠️ -dontoptimize عامّ لا موضعي: وجوده في أيّ ملف قواعد مشمول —
+#    بما فيها قواعد المكتبات المستهلَكة — يُعطّل التحسين كلّه. ولهذا
+#    نفحص إعدادات R8 المدمجة بعد البناء لا هذا الملف وحده.
+if "proguard-android.txt" in new_body:
+    new_body = new_body.replace("proguard-android.txt", "proguard-android-optimize.txt")
+    print("🔧 استُبدل proguard-android.txt بـproguard-android-optimize.txt "
+          "(رفعُ -dontoptimize)")
+
+# ── تقليص الموارد ─────────────────────────────────────────────────────
+# Play تطلبه صراحةً ضمن تنبيه الذاكرة والأداء. وخطره المعروف أنه يحذف
+# ما يُحمَّل بالاسم عبر getIdentifier — وقد فُحص هذا المشروع فلا أثر
+# لها فيه، وكل موارده يُشار إليها بثوابت R.xxx التي يتتبّعها المُقلِّص.
+# وأصول الويب في assets/ لا يمسّها التقليص أصلاً (هو على res/ وحدها).
+#
+# ومفتاح إطفائه مستقلّ عن DISABLE_R8 عمداً: إن ظهر عطب بعد هذا الإصدار
+# يمكن إطفاء التقليص وحده وإبقاء R8 — فيُعزل السبب في خطوة واحدة بدل
+# التراجع عن كل شيء.
+if os.environ.get('DISABLE_SHRINK_RES', '0') == '1':
+    print('⏭️  تقليص الموارد مُعطَّل عبر DISABLE_SHRINK_RES=1')
+elif re.search(r'shrinkResources\s+(true|false)', new_body):
+    new_body = re.sub(r'shrinkResources\s+(true|false)', 'shrinkResources true', new_body)
+else:
+    new_body = '\n            shrinkResources true' + new_body
+
 new_block = block[:rel.end()] + new_body + block[j-1:]
 open(path, 'w', encoding='utf-8').write(src[:bt_start] + new_block + src[bt_end:])
-print('✅ عُدِّل build.gradle: minifyEnabled true + proguard-notic.pro')
+print('✅ عُدِّل build.gradle: minifyEnabled + proguard-notic.pro + التحسين')
 PY
 
 # ── تحقّق فعلي بعد التعديل ────────────────────────────────────────────
@@ -110,7 +152,45 @@ if ! grep -q 'proguard-notic.pro' "$GRADLE"; then
   echo "::error::ملف القواعد غير مُسجَّل في build.gradle — R8 سيعمل بلا حماية الإضافات"
   exit 1
 fi
+# ⚠️ ما تحت هذا يُفحص داخل كتلة release وحدها، لا في الملف كلّه.
+#    فحصٌ على الملف كاملاً كان سيُفشل البناء بإنذار كاذب لو ورد الاسم
+#    في كتلة debug — وهي كتلة لا يمسّها هذا السكربت ولا يعمل فيها R8.
+python3 - "$GRADLE" "${DISABLE_SHRINK_RES:-0}" <<'PY'
+import re, sys
+path, shrink_off = sys.argv[1], sys.argv[2] == '1'
+src = open(path, encoding='utf-8').read()
+
+m = re.search(r'buildTypes\s*\{', src)
+i, d = m.end(), 1
+while i < len(src) and d:
+    if src[i] == '{': d += 1
+    elif src[i] == '}': d -= 1
+    i += 1
+block = src[m.start():i]
+rel = re.search(r'release\s*\{', block)
+j, d = rel.end(), 1
+while j < len(block) and d:
+    if block[j] == '{': d += 1
+    elif block[j] == '}': d -= 1
+    j += 1
+body = block[rel.end():j-1]
+
+errs = []
+# proguard-android.txt يحمل -dontoptimize، وبقاؤه يعني R8 بلا تحسين —
+# وهو عين ما تشكو منه Play.
+if 'proguard-android.txt' in body:
+    errs.append('proguard-android.txt ما زال في كتلة release — '
+                '-dontoptimize فعّال والتحسين مُعطَّل')
+if 'proguard-android-optimize.txt' not in body:
+    errs.append('proguard-android-optimize.txt غير مُسجَّل في كتلة release')
+if not shrink_off and not re.search(r'shrinkResources\s+true', body):
+    errs.append('shrinkResources true غير موجود في كتلة release')
+
+for e in errs:
+    print(f'::error::{e}')
+raise SystemExit(1 if errs else 0)
+PY
 [ -f "$RULES_DST" ] || { echo "::error::$RULES_DST غير موجود"; exit 1; }
 
-echo "✅ R8 مُفعَّل، وقواعد الإبقاء في مكانها"
-grep -nE 'minifyEnabled|proguardFiles' "$GRADLE" | sed 's/^/   /'
+echo "✅ R8 مُفعَّل، والتحسين مرفوع المنع، وقواعد الإبقاء في مكانها"
+grep -nE 'minifyEnabled|shrinkResources|proguardFiles' "$GRADLE" | sed 's/^/   /'

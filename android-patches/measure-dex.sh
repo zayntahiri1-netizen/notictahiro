@@ -74,6 +74,27 @@ else
   echo "     (متوقَّع وجوده مع AGP 8.10+ — فغيابه يستحقّ النظر)"
 fi
 
+# ─── 2ب. هل بقي -dontoptimize في الإعدادات المدمجة؟ ───────────────────
+# R8 يكتب كل القواعد التي عمل بها — قواعدنا وقواعد كل مكتبة مستهلَكة —
+# في configuration.txt. وهذا هو الفحص الوحيد القاطع: -dontoptimize عامّ،
+# فيكفي أن تحمله مكتبةٌ واحدة ليُعطَّل التحسين كلّه مهما فعلنا في
+# build.gradle.
+echo
+echo "── مرحلة التحسين (optimization) ──"
+CFG="android/app/build/outputs/mapping/release/configuration.txt"
+if [ -f "$CFG" ]; then
+  if grep -qE '^\s*-dontoptimize' "$CFG"; then
+    echo "  ⚠️ -dontoptimize ما زال موجوداً في الإعدادات المدمجة — التحسين مُعطَّل."
+    echo "     مصدره ليس build.gradle (فُحص)، بل قواعد إحدى المكتبات:"
+    grep -nE '^\s*-dontoptimize' "$CFG" | head -3 | sed 's/^/       /'
+  else
+    echo "  ✅ لا -dontoptimize — مرحلة التحسين عاملة"
+  fi
+  echo "  (إجمالي القواعد المدمجة: $(grep -c . "$CFG" || echo '?') سطراً)"
+else
+  echo "  ℹ️ configuration.txt غير موجود في $CFG"
+fi
+
 # ─── 3. mapping — مسار الاحتساب البديل، وفكّ آثار الانهيار ────────────
 echo
 echo "── ملف الربط (mapping) ──"
