@@ -566,6 +566,7 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                   <a href="/delete-data" className="rounded-xl bg-red-500/10 px-1.5 py-1.5 text-center text-[10px] font-black text-red-500 transition hover:bg-red-500/20">🧹 {t('deleteData')}</a>
                   <a href="/about" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>✨ {t('about')}</a>
                   <a href="/contact" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>💌 {t('contact')}</a>
+                  <a href="/terms" className={`col-span-2 rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📜 {t('terms')}</a>
                   <button onClick={() => { void showPrivacyOptions(); }} className={`col-span-2 rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>⚙️ {t('privacyOptions')}</button>
                   <button
                     onClick={() => openOver(() => setShowErrLog(true))}

@@ -48,7 +48,7 @@ const LazyToolFallback = () => (
   </div>
 );
 
-const staticRoutes: StaticPageKind[] = ['privacy', 'delete-data', 'about', 'contact'];
+const staticRoutes: StaticPageKind[] = ['privacy', 'terms', 'delete-data', 'about', 'contact'];
 
 function getStaticRoute(): StaticPageKind | null {
   const pathRoute = window.location.pathname.replace(/^\//, '') as StaticPageKind;

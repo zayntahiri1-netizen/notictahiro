@@ -10,6 +10,7 @@ import { CaretSafeInput } from './CaretSafe';
 
 import ListenButton from './ListenButton';
 import { reportWriteFailure } from '../utils/storageHealth';
+import { fmtDate } from '../utils/dateLocale';
 interface Habit {
   id: string;
   name: string;
@@ -136,7 +137,7 @@ export default function HabitTracker({ onClose }: HabitTrackerProps) {
   const today = todayKey();
 
   const dayLabels = useMemo(
-    () => week.map(d => new Date(d).toLocaleDateString('ar-MA', { weekday: 'narrow' })),
+    () => week.map(d => fmtDate(d, language, { weekday: 'narrow' })),
     [week]
   );
 

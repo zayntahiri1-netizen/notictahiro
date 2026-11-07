@@ -8,6 +8,19 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as haptics from '../utils/haptics';
 import { VOICE_CATALOG, getVoicePref, setVoicePref, subscribeVoice, currentVoiceMeta } from '../utils/voicePref';
+import { useApp } from '../context/AppContext';
+
+// نصوص النافذة بأربع لغات. كانت عربيةً ثابتة فتظهر داخل واجهة إنجليزية.
+const UI = {
+  ar: { title: '🎙️ اختر الصوت', close: 'إغلاق', dialog: 'اختيار الصوت',
+        current: (v: string) => `الصوت: ${v}`, change: (v: string) => `تغيير الصوت — الحالي ${v}` },
+  en: { title: '🎙️ Choose a voice', close: 'Close', dialog: 'Voice selection',
+        current: (v: string) => `Voice: ${v}`, change: (v: string) => `Change voice — currently ${v}` },
+  es: { title: '🎙️ Elegir voz', close: 'Cerrar', dialog: 'Selección de voz',
+        current: (v: string) => `Voz: ${v}`, change: (v: string) => `Cambiar voz — actual ${v}` },
+  zh: { title: '🎙️ 选择语音', close: '关闭', dialog: '语音选择',
+        current: (v: string) => `语音：${v}`, change: (v: string) => `更改语音 — 当前 ${v}` },
+} as const;
 
 interface Props {
   darkMode?: boolean;
@@ -17,13 +30,15 @@ interface Props {
 }
 
 export default function VoicePicker({ darkMode = true, variant = 'bar', className = '' }: Props) {
+  const { language, direction } = useApp();
+  const S = UI[language] ?? UI.en;
   const [open, setOpen] = useState(false);
   const [voice, setVoice] = useState(getVoicePref);
 
   // اختيارٌ غُيِّر من نافذة أخرى يجب أن يظهر هنا بلا إعادة فتح
   useEffect(() => subscribeVoice(setVoice), []);
 
-  const meta = currentVoiceMeta();
+  const meta = currentVoiceMeta(language);
 
   const pick = (id: string) => {
     haptics.tap('light');
@@ -36,8 +51,8 @@ export default function VoicePicker({ darkMode = true, variant = 'bar', classNam
     <>
       <button
         onClick={() => { haptics.tap('light'); setOpen(true); }}
-        title={`الصوت: ${meta.label}`}
-        aria-label={`تغيير الصوت — الحالي ${meta.label}`}
+        title={S.current(meta.label)}
+        aria-label={S.change(meta.label)}
         className={`flex h-8 items-center gap-1 rounded-full px-2 text-sm transition active:scale-95 ${
           variant === 'bar'
             ? 'bg-white/20 text-white hover:bg-white/30'
@@ -45,7 +60,7 @@ export default function VoicePicker({ darkMode = true, variant = 'bar', classNam
         } ${className}`}
       >
         <span>🎙️</span>
-        <span className="text-[10px] font-bold">{meta.label.replace(/^\S+\s/, '')}</span>
+        <span className="text-[10px] font-bold">{meta.label}</span>
       </button>
 
       {open && createPortal(
@@ -57,11 +72,11 @@ export default function VoicePicker({ darkMode = true, variant = 'bar', classNam
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="اختيار الصوت"
+          aria-label={S.dialog}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            dir="rtl"
+            dir={direction}
             className={`flex max-h-[70vh] w-full max-w-sm flex-col overflow-hidden rounded-3xl border animate-scale-in ${
               darkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-white'
             }`}
@@ -70,11 +85,11 @@ export default function VoicePicker({ darkMode = true, variant = 'bar', classNam
               darkMode ? 'border-gray-800' : 'border-gray-200'
             }`}>
               <span className={`flex items-center gap-2 text-sm font-black ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                🎙️ اختر الصوت
+                {S.title}
               </span>
               <button
                 onClick={() => setOpen(false)}
-                aria-label="إغلاق"
+                aria-label={S.close}
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-lg ${
                   darkMode ? 'bg-gray-900 text-gray-400' : 'bg-gray-100 text-gray-500'
                 }`}
@@ -97,9 +112,9 @@ export default function VoicePicker({ darkMode = true, variant = 'bar', classNam
                     <span className="min-w-0">
                       <span className={`block text-sm font-bold ${
                         active ? 'text-violet-400' : darkMode ? 'text-gray-100' : 'text-gray-800'
-                      }`}>{v.label}</span>
+                      }`}>{v.emoji} {v.label[language] ?? v.label.en}</span>
                       <span className={`block truncate text-[11px] ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {v.hint}
+                        {v.hint[language] ?? v.hint.en}
                       </span>
                     </span>
                     {active && <span className="shrink-0 text-violet-400">✓</span>}

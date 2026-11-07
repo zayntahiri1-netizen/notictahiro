@@ -6,6 +6,7 @@ import { aiGenerateDebtMessage } from '../utils/aiEngine';
 import { CaretSafeInput, CaretSafeTextarea } from './CaretSafe';
 
 import ListenButton from './ListenButton';
+import { fmtDate } from '../utils/dateLocale';
 interface DebtCreditManagerProps {
   onClose: () => void;
 }
@@ -210,7 +211,7 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
       d.paidAmount,
       d.amount - d.paidAmount,
       d.status === 'paid' ? 'مسدد' : d.status === 'partial' ? 'جزئي' : 'معلق',
-      new Date(d.dueDate).toLocaleDateString('ar-MA'),
+      fmtDate(d.dueDate, language),
       d.description,
     ]);
     await exportCSV(`Notic-Debts-${new Date().toISOString().split('T')[0]}`, headers, rows);
@@ -427,7 +428,7 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
 
   // تنسيق التاريخ
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ar-MA', {
+    return fmtDate(dateStr, language, {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
     });
   };

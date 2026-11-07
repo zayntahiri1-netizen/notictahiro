@@ -77,7 +77,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
       tagsTitle: 'وسوم ذكية مقترحة', timelineTitle: 'التوقعات القادمة', noEvents: 'لا توجد أحداث قريبة حالياً.',
       draftDesc: 'اكتب فكرة خام وسيحوّلها Tahiro إلى ملاحظة منظمة.',
       draftPlaceholder: 'مثال: أريد إرسال رسالة للعميل عن تأخير التسليم مع اعتذار محترم...',
-      generateDraft: '{S.generateDraft}', draftDone: 'تم إنشاء المسودة كملاحظة ✅',
+      generateDraft: '✨ توليد ملاحظة ذكية', draftTitle: 'استوديو الصياغة الذكية', draftDone: 'تم إنشاء المسودة كملاحظة ✅',
       upgradeTitle: 'تطوير ذكي شامل بنقرة واحدة',
       upgradeDesc: 'ينظم الملاحظات، ينشئ خطة اليوم، يحضر رسائل الديون، ويولد تقريراً شاملاً.',
       upgradeRunning: 'جاري تنفيذ الحزمة...', upgradeDone: 'تم التطوير الشامل ✅', upgradeRun: 'تشغيل الحزمة الكاملة →',
@@ -116,7 +116,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
       tagsTitle: 'Suggested smart tags', timelineTitle: 'Upcoming events', noEvents: 'No upcoming events right now.',
       draftDesc: 'Write a raw idea and Tahiro will turn it into an organized note.',
       draftPlaceholder: 'Example: I want to send a client message about a delivery delay with a polite apology...',
-      generateDraft: '✨ Generate smart note', draftDone: 'Draft created as a note ✅',
+      generateDraft: '✨ Generate smart note', draftTitle: 'AI Draft Studio', draftDone: 'Draft created as a note ✅',
       upgradeTitle: 'One-click full smart upgrade',
       upgradeDesc: "Organizes notes, creates today's plan, prepares debt messages, and generates a full report.",
       upgradeRunning: 'Running the bundle...', upgradeDone: 'Full upgrade done ✅', upgradeRun: 'Run the full bundle →',
@@ -155,7 +155,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
       tagsTitle: 'Etiquetas inteligentes sugeridas', timelineTitle: 'Próximos eventos', noEvents: 'No hay eventos próximos.',
       draftDesc: 'Escribe una idea en bruto y Tahiro la convertirá en una nota organizada.',
       draftPlaceholder: 'Ejemplo: quiero enviar un mensaje al cliente sobre un retraso con una disculpa cortés...',
-      generateDraft: '✨ Generar nota inteligente', draftDone: 'Borrador creado como nota ✅',
+      generateDraft: '✨ Generar nota inteligente', draftTitle: 'Estudio de redacción IA', draftDone: 'Borrador creado como nota ✅',
       upgradeTitle: 'Mejora inteligente con un clic',
       upgradeDesc: 'Organiza notas, crea el plan del día, prepara mensajes de deudas y genera un informe completo.',
       upgradeRunning: 'Ejecutando el paquete...', upgradeDone: 'Mejora completa lista ✅', upgradeRun: 'Ejecutar paquete completo →',
@@ -194,7 +194,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
       tagsTitle: '推荐的智能标签', timelineTitle: '即将发生的事件', noEvents: '当前没有临近事件。',
       draftDesc: '写下原始想法，Tahiro 会将其转换为有条理的笔记。',
       draftPlaceholder: '例如：我想给客户发送一条关于交付延迟的消息，并礼貌道歉...',
-      generateDraft: '✨ 生成智能笔记', draftDone: '草稿已创建为笔记 ✅',
+      generateDraft: '✨ 生成智能笔记', draftTitle: 'AI 草稿工作室', draftDone: '草稿已创建为笔记 ✅',
       upgradeTitle: '一键全面智能升级',
       upgradeDesc: '整理笔记、创建今日计划、准备债务消息并生成完整报告。',
       upgradeRunning: '正在执行套餐...', upgradeDone: '全面升级完成 ✅', upgradeRun: '运行完整套餐 →',
@@ -666,7 +666,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
             <div className={`rounded-3xl border p-5 ${darkMode ? 'border-gray-700 bg-gray-900/70' : 'border-gray-200 bg-white'}`}>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <div className="font-black">AI Draft Studio</div>
+                  <div className="font-black">{S.draftTitle}</div>
                   <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{S.draftDesc}</p>
                 </div>
                 <select
@@ -692,7 +692,7 @@ export default function AICopilot({ onClose }: AICopilotProps) {
                 disabled={!draftInput.trim() || workingAction === 'draft'}
                 className="w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-500/20 transition hover:scale-[1.01] disabled:opacity-50"
               >
-                ✨ توليد ملاحظة ذكية
+                {S.generateDraft}
               </button>
               {completedAction === 'draft' && <div className="mt-2 text-xs font-bold text-emerald-500">{S.draftDone}</div>}
             </div>

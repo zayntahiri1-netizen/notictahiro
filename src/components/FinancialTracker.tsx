@@ -5,6 +5,7 @@ import { CaretSafeInput } from './CaretSafe';
 
 import ListenButton from './ListenButton';
 import { reportWriteFailure } from '../utils/storageHealth';
+import { fmtDate, fmtTime, fmtDateTime, fmtNumber } from '../utils/dateLocale';
 interface FinancialTrackerProps {
   onClose: () => void;
 }
@@ -210,7 +211,7 @@ export default function FinancialTracker({ onClose }: FinancialTrackerProps) {
       t.currency,
       t.description,
       categoryLabels[t.category] ?? t.category,
-      new Date(t.date).toLocaleString('ar-MA'),
+      fmtDateTime(t.date, language),
     ]);
     await exportCSV(`Notic-Finance-${new Date().toISOString().split('T')[0]}`, headers, rows);
   };
@@ -457,16 +458,16 @@ export default function FinancialTracker({ onClose }: FinancialTrackerProps) {
                           <div className={`text-xs mt-0.5 flex items-center gap-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                             <span>{categoryLabels[t.category]}</span>
                             <span>•</span>
-                            <span>{new Date(t.date).toLocaleDateString('ar-MA', { month: 'short', day: 'numeric' })}</span>
+                            <span>{fmtDate(t.date, language, { month: 'short', day: 'numeric' })}</span>
                             <span>•</span>
-                            <span>{new Date(t.date).toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>{fmtTime(t.date, language, { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <div className="text-right">
-                          <div className="font-bold text-emerald-500">{Number.isFinite(t.amount) ? t.amount.toLocaleString('ar-MA', { maximumFractionDigits: 2 }) : '–'}</div>
+                          <div className="font-bold text-emerald-500">{fmtNumber(t.amount, language, { maximumFractionDigits: 2 })}</div>
                           <div className="text-[10px] text-gray-400">{t.currency}</div>
                         </div>
                         <button
@@ -485,7 +486,7 @@ export default function FinancialTracker({ onClose }: FinancialTrackerProps) {
                   // السجل التاريخي الكامل - مجمع حسب التاريخ
                   (() => {
                     const grouped = transactions.reduce((acc, t) => {
-                      const date = new Date(t.date).toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' });
+                      const date = fmtDate(t.date, language, { year: 'numeric', month: 'long', day: 'numeric' });
                       if (!acc[date]) acc[date] = [];
                       acc[date].push(t);
                       return acc;
@@ -510,11 +511,11 @@ export default function FinancialTracker({ onClose }: FinancialTrackerProps) {
                                 <span className="text-base">{categoryIcons[t.category]}</span>
                                 <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>{t.description}</span>
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
-                                  {new Date(t.date).toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' })}
+                                  {fmtTime(t.date, language, { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2.5">
-                                <span className="font-medium text-emerald-500 text-sm">{Number.isFinite(t.amount) ? t.amount.toLocaleString('ar-MA', { maximumFractionDigits: 2 }) : '–'} {t.currency}</span>
+                                <span className="font-medium text-emerald-500 text-sm">{fmtNumber(t.amount, language, { maximumFractionDigits: 2 })} {t.currency}</span>
                                 <button
                                   onClick={() => deleteTransaction(t.id)}
                                   aria-label="حذف"
