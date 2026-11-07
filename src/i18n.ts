@@ -11,6 +11,7 @@ export const rtlLanguages: AppLanguage[] = ['ar'];
 
 export const translations = {
   ar: {
+    terms: 'الشروط',
     appName: 'Notic Tahiro',
     appSubtitle: 'مساعدك الذكي للإنتاجية',
     smartNotebook: 'المفكرة الذكية',
@@ -85,10 +86,6 @@ export const translations = {
     lightMode: 'الوضع الفاتح',
     language: 'اللغة',
     profile: 'الملف الشخصي',
-    terms: 'الشروط',
-    terms: 'Terms',
-    terms: 'Términos',
-    terms: '条款',
     privacy: 'الخصوصية',
     privacyOptions: 'إعدادات خصوصية الإعلانات',
     deleteData: 'حذف البيانات',
@@ -186,6 +183,7 @@ export const translations = {
     vrRecordingTitle: 'تسجيل صوتي',
   },
   en: {
+    terms: 'Terms',
     appName: 'Notic Tahiro',
     appSubtitle: 'Your AI productivity assistant',
     smartNotebook: 'Smart notebook',
@@ -357,6 +355,7 @@ export const translations = {
     vrRecordingTitle: 'Voice recording',
   },
   es: {
+    terms: 'Términos',
     appName: 'Notic Tahiro',
     appSubtitle: 'Tu asistente inteligente de productividad',
     smartNotebook: 'Cuaderno inteligente',
@@ -528,6 +527,7 @@ export const translations = {
     vrRecordingTitle: 'Grabación de voz',
   },
   zh: {
+    terms: '条款',
     appName: 'Notic Tahiro',
     appSubtitle: '你的 AI 效率助手',
     smartNotebook: '智能笔记本',

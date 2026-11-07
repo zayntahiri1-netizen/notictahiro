@@ -13,4 +13,4 @@
  * سير العمل يحسبه من رقم التشغيل (1.0.<run_number>) في خطوة
  * Auto-increment versionCode. فما يراه المستخدم في Play ليس هذا الرقم.
  */
-export const APP_VERSION = '1.9.28';
+export const APP_VERSION = '1.9.29';
