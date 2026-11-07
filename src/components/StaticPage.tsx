@@ -111,6 +111,19 @@ export default function StaticPage({ page }: StaticPageProps) {
     return content[language][page];
   }, [language, page]);
 
+  // تسميات شريط التنقّل — خريطة لا سلسلة شرطية.
+  // كانت سلسلةً آخرها t('contact')، فلمّا أُضيفت صفحة الشروط إلى
+  // المصفوفة دون فرعٍ لها سقطت إلى ذلك الآخِر وظهرت باسم «اتصل بنا».
+  // والنوع Record<StaticPageKind, string> يجعل المترجِم يرفض البناء إن
+  // أُضيفت صفحة بلا تسمية — فالعطب نفسه لا يمكن أن يتكرّر صامتاً.
+  const navLabel: Record<StaticPageKind, string> = {
+    privacy: t('privacy'),
+    terms: t('terms'),
+    'delete-data': t('deleteData'),
+    about: t('about'),
+    contact: t('contact'),
+  };
+
   const deleteLocalData = () => {
     localStorage.clear();
     sessionStorage.clear();
@@ -132,7 +145,7 @@ export default function StaticPage({ page }: StaticPageProps) {
           <nav className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             {(['privacy', 'terms', 'delete-data', 'about', 'contact'] as StaticPageKind[]).map(item => (
               <a key={item} href={`/${item}`} className={`rounded-full px-3 py-2 text-center text-xs font-bold text-white/75 transition hover:bg-white/10 hover:text-white ${page === item ? 'bg-white/15 text-white' : ''}`}>
-                {item === 'privacy' ? t('privacy') : item === 'delete-data' ? t('deleteData') : item === 'about' ? t('about') : t('contact')}
+                {navLabel[item]}
               </a>
             ))}
             <a href="/" className="col-span-2 rounded-full bg-white/15 px-4 py-2 text-center text-xs font-bold text-white backdrop-blur-md transition hover:bg-white/25 sm:col-span-1">

@@ -11,6 +11,10 @@ export const rtlLanguages: AppLanguage[] = ['ar'];
 
 export const translations = {
   ar: {
+    timeUsage: 'استعمال الزمن',
+    luckyDraw: 'القرعة',
+    billSplit: 'تقسيم الفاتورة',
+    unitConverter: 'محوّل الوحدات',
     terms: 'الشروط',
     appName: 'Notic Tahiro',
     appSubtitle: 'مساعدك الذكي للإنتاجية',
@@ -183,6 +187,10 @@ export const translations = {
     vrRecordingTitle: 'تسجيل صوتي',
   },
   en: {
+    timeUsage: 'Time usage',
+    luckyDraw: 'Lucky draw',
+    billSplit: 'Bill split',
+    unitConverter: 'Unit converter',
     terms: 'Terms',
     appName: 'Notic Tahiro',
     appSubtitle: 'Your AI productivity assistant',
@@ -355,6 +363,10 @@ export const translations = {
     vrRecordingTitle: 'Voice recording',
   },
   es: {
+    timeUsage: 'Uso del tiempo',
+    luckyDraw: 'Sorteo',
+    billSplit: 'Dividir cuenta',
+    unitConverter: 'Conversor',
     terms: 'Términos',
     appName: 'Notic Tahiro',
     appSubtitle: 'Tu asistente inteligente de productividad',
@@ -527,6 +539,10 @@ export const translations = {
     vrRecordingTitle: 'Grabación de voz',
   },
   zh: {
+    timeUsage: '时间使用',
+    luckyDraw: '抽签',
+    billSplit: '账单分摊',
+    unitConverter: '单位换算',
     terms: '条款',
     appName: 'Notic Tahiro',
     appSubtitle: '你的 AI 效率助手',

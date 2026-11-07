@@ -38,6 +38,10 @@ const HabitTracker      = lazy(() => import('./components/HabitTracker'));
 const DebtCreditManager = lazy(() => import('./components/DebtCreditManager'));
 const AICopilot         = lazy(() => import('./components/AICopilot'));
 const FloatingAIChat    = lazy(() => import('./components/FloatingAIChat'));
+const TimeUsage         = lazy(() => import('./components/TimeUsage'));
+const LuckyDraw         = lazy(() => import('./components/LuckyDraw'));
+const BillSplit         = lazy(() => import('./components/BillSplit'));
+const UnitConverter     = lazy(() => import('./components/UnitConverter'));
 
 // مؤشّر تحميل بسيط للأدوات المفتوحة كنوافذ
 const LazyToolFallback = () => (
@@ -264,6 +268,10 @@ function AppContent() {
   const [showClipboard, setShowClipboard] = useState(false);
   const [showDecisionMatrix, setShowDecisionMatrix] = useState(false);
   const [showFocusSprint, setShowFocusSprint] = useState(false);
+  const [showTimeUsage, setShowTimeUsage] = useState(false);
+  const [showLuckyDraw, setShowLuckyDraw] = useState(false);
+  const [showBillSplit, setShowBillSplit] = useState(false);
+  const [showUnitConv, setShowUnitConv] = useState(false);
 
   // ─── كاشف انتقالات النوافذ (إعلان بيني احترافي) ───────────────────
   // بدل نثر استدعاءات الإعلان في كل نافذة (تكرار + سهولة النسيان)، نراقب
@@ -657,6 +665,58 @@ function AppContent() {
                     <span>📋</span>
                     <span className="hidden lg:inline text-sm">{t('clipboard')}</span>
                   </button>
+                  {/* استعمال الزمن */}
+                  <button aria-label={t('timeUsage')}
+                    onClick={() => setShowTimeUsage(true)}
+                    className={`p-3 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+                      darkMode
+                        ? 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-400'
+                        : 'bg-sky-50 hover:bg-sky-100 text-sky-600'
+                    }`}
+                    title={t('timeUsage')}
+                  >
+                    <span>⏱️</span>
+                    <span className="hidden lg:inline text-sm">{t('timeUsage')}</span>
+                  </button>
+                  {/* القرعة */}
+                  <button aria-label={t('luckyDraw')}
+                    onClick={() => setShowLuckyDraw(true)}
+                    className={`p-3 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+                      darkMode
+                        ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-600'
+                    }`}
+                    title={t('luckyDraw')}
+                  >
+                    <span>🎲</span>
+                    <span className="hidden lg:inline text-sm">{t('luckyDraw')}</span>
+                  </button>
+                  {/* تقسيم الفاتورة */}
+                  <button aria-label={t('billSplit')}
+                    onClick={() => setShowBillSplit(true)}
+                    className={`p-3 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+                      darkMode
+                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400'
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'
+                    }`}
+                    title={t('billSplit')}
+                  >
+                    <span>🧾</span>
+                    <span className="hidden lg:inline text-sm">{t('billSplit')}</span>
+                  </button>
+                  {/* محوّل الوحدات */}
+                  <button aria-label={t('unitConverter')}
+                    onClick={() => setShowUnitConv(true)}
+                    className={`p-3 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+                      darkMode
+                        ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600'
+                    }`}
+                    title={t('unitConverter')}
+                  >
+                    <span>📏</span>
+                    <span className="hidden lg:inline text-sm">{t('unitConverter')}</span>
+                  </button>
 
                   <button
                     onClick={handleNewNote}
@@ -870,6 +930,10 @@ function AppContent() {
 
       {/* الحافظة السحرية الواعية */}
       {showClipboard && <Suspense fallback={<LazyToolFallback />}><SmartClipboard onClose={() => setShowClipboard(false)} /></Suspense>}
+      {showTimeUsage && <Suspense fallback={<LazyToolFallback />}><TimeUsage onClose={() => setShowTimeUsage(false)} /></Suspense>}
+      {showLuckyDraw && <Suspense fallback={<LazyToolFallback />}><LuckyDraw onClose={() => setShowLuckyDraw(false)} /></Suspense>}
+      {showBillSplit && <Suspense fallback={<LazyToolFallback />}><BillSplit onClose={() => setShowBillSplit(false)} /></Suspense>}
+      {showUnitConv && <Suspense fallback={<LazyToolFallback />}><UnitConverter onClose={() => setShowUnitConv(false)} /></Suspense>}
 
       {/* مصفوفة اتخاذ القرار */}
       {showDecisionMatrix && <Suspense fallback={<LazyToolFallback />}><DecisionMatrix onClose={() => setShowDecisionMatrix(false)} /></Suspense>}

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useApp, DebtCredit } from '../context/AppContext';
 import PromptModal, { ConfirmModal } from './PromptModal';
 import { exportCSV } from '../utils/exportData';
-import { aiGenerateDebtMessage } from '../utils/aiEngine';
+import DebtMessageModal from './DebtMessageModal';
 import { CaretSafeInput, CaretSafeTextarea } from './CaretSafe';
 
 import ListenButton from './ListenButton';
@@ -34,7 +34,7 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
           creditLabel: 'لي (دائن)', debtLabel: 'عليّ (مدين)', remaining: 'متبقي', paid: 'مدفوع',
           beforeDays: (a: number) => `🔔 قبل ${a} أيام`, dailyAt: (t: string) => `🔁 يومي ${t}`,
           recordPayment: 'تسجيل دفعة', edit: 'تعديل', delete: 'حذف', genMsg: 'توليد رسالة تذكير ذكية',
-          reminderMsg: 'رسالة تذكير', copy: '{D.copy}', share: '{D.share}', exportBtn: 'تصدير', groupBtn: 'حسب الشخص',
+          reminderMsg: 'رسالة تذكير', copy: '📋 نسخ', share: '📤 مشاركة', exportBtn: 'تصدير', groupBtn: 'حسب الشخص',
           delTitle: 'حذف السجل', delMsg: 'هل تريد حذف هذا السجل المالي نهائياً؟ لن تتمكن من استعادته.', delConfirm: '🗑️ نعم، احذف', delCancel: 'تراجع',
           payTo: (n: string) => `دفعة لـ ${n}`, payTitle: 'تسجيل دفعة', payRemaining: (a: number, c: string) => `المبلغ المتبقي: ${a} ${c}`,
           payPh: 'أدخل المبلغ المدفوع...', payConfirm: '💵 تسجيل الدفعة',
@@ -143,8 +143,9 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
     tagCredit: 'creditor', tagDebt: 'debtor', tagQuick: 'quick_add', defaultDesc: (t: string, n: string) => `${t === 'credit' ? 'Owed to me by' : 'I owe'} ${n}` };
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [aiMsgFor, setAiMsgFor] = useState<string | null>(null); // id السجل الجاري توليد رسالته
-  const [aiMsg, setAiMsg] = useState<{ id: string; text: string } | null>(null);
+  const [msgFor, setMsgFor] = useState<{
+    personName: string; amount: number; currency: string; dueDate: string; type: 'credit' | 'debt';
+  } | null>(null);
   const [filterType, setFilterType] = useState<DebtCreditFilterType>('all');
   const [groupByPerson, setGroupByPerson] = useState(false);
   const [filterStatus, setFilterStatus] = useState<DebtCreditStatus>('all');
@@ -568,27 +569,16 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
                           </button>
                           {dc.status !== 'paid' && (
                             <button
-                              onClick={async () => {
-                                if (aiMsgFor) return;
-                                setAiMsgFor(dc.id);
-                                try {
-                                  const localeMap: Record<string, string> = { ar: 'ar-MA', en: 'en-US', es: 'es-ES', zh: 'zh-CN' };
-                                  const text = await aiGenerateDebtMessage(
-                                    dc.personName,
-                                    dc.amount - dc.paidAmount,
-                                    dc.currency,
-                                    new Date(dc.dueDate).toLocaleDateString(localeMap[language] ?? 'en-US'),
-                                    dc.type
-                                  );
-                                  setAiMsg({ id: dc.id, text });
-                                } finally {
-                                  setAiMsgFor(null);
-                                }
-                              }}
-                              disabled={aiMsgFor === dc.id}
-                              className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30 hover:bg-violet-200 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 text-xs transition-colors disabled:opacity-50"
+                              onClick={() => setMsgFor({
+                                personName: dc.personName,
+                                amount: dc.amount - dc.paidAmount,
+                                currency: dc.currency,
+                                dueDate: fmtDate(dc.dueDate, language),
+                                type: dc.type,
+                              })}
+                              className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30 hover:bg-violet-200 dark:hover:bg-violet-900/50 text-violet-600 dark:text-violet-400 text-xs transition-colors"
                               title={D.genMsg}>
-                              {aiMsgFor === dc.id ? '⏳' : '✉️'}
+                              ✉️
                             </button>
                           )}
                         </div>
@@ -1061,48 +1051,16 @@ export default function DebtCreditManager({ onClose }: DebtCreditManagerProps) {
         </div>
       </div>
 
-      {/* نافذة الرسالة الذكية المولّدة */}
-      {aiMsg && (
-        <div className="fixed inset-0 pb-banner z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setAiMsg(null)}>
-          <div onClick={e => e.stopPropagation()}
-            className={`w-full max-w-md rounded-2xl p-5 shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">✉️</span>
-              <h3 className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{D.reminderMsg} جاهزة</h3>
-            </div>
-            <p className={`text-sm leading-7 whitespace-pre-wrap rounded-xl p-3 mb-4 ${darkMode ? 'bg-gray-900 text-gray-300' : 'bg-gray-50 text-gray-700'}`}>
-              {aiMsg.text}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(aiMsg.text);
-                  } catch { /* ignore */ }
-                  setAiMsg(null);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-sm font-bold transition-colors">
-                {D.copy}
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const { Capacitor } = await import('@capacitor/core');
-                    if (Capacitor.isNativePlatform()) {
-                      const { Share } = await import('@capacitor/share');
-                      await Share.share({ text: aiMsg.text });
-                    } else if (navigator.share) {
-                      await navigator.share({ text: aiMsg.text });
-                    }
-                  } catch { /* ignore */ }
-                  setAiMsg(null);
-                }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>
-                {D.share}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* صياغة رسالة الدَّين وإرسالها */}
+      {msgFor && (
+        <DebtMessageModal
+          personName={msgFor.personName}
+          amount={msgFor.amount}
+          currency={msgFor.currency}
+          dueDate={msgFor.dueDate}
+          type={msgFor.type}
+          onClose={() => setMsgFor(null)}
+        />
       )}
 
       {/* نافذة تأكيد الحذف الفاخرة */}
