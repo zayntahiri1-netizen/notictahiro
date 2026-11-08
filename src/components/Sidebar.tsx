@@ -16,6 +16,7 @@ import { isSyncConfigured } from '../utils/cloudSync';
 import { isProactiveNotifyEnabled, setProactiveNotifyEnabled } from '../utils/proactiveNotify';
 import { getEntries } from '../utils/errorLog';
 import { APP_VERSION } from '../version';
+import { SITE } from '../utils/siteLinks';
 import { CaretSafeInput } from './CaretSafe';
 import {
   isBubbleSupported, checkBubblePermission, requestBubblePermission,
@@ -562,11 +563,11 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                   <span className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-black text-violet-500">LINKS</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                  <a href="/privacy" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🔒 {t('privacy')}</a>
-                  <a href="/delete-data" className="rounded-xl bg-red-500/10 px-1.5 py-1.5 text-center text-[10px] font-black text-red-500 transition hover:bg-red-500/20">🧹 {t('deleteData')}</a>
+                  <a href={SITE.privacy} target="_blank" rel="noopener noreferrer" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🔒 {t('privacy')}</a>
+                  <a href={SITE.deleteData} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-red-500/10 px-1.5 py-1.5 text-center text-[10px] font-black text-red-500 transition hover:bg-red-500/20">🧹 {t('deleteData')}</a>
                   <a href="/about" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>✨ {t('about')}</a>
                   <a href="/contact" className={`rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>💌 {t('contact')}</a>
-                  <a href="/terms" className={`col-span-2 rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📜 {t('terms')}</a>
+                  <a href={SITE.terms} target="_blank" rel="noopener noreferrer" className={`col-span-2 rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📜 {t('terms')}</a>
                   <button onClick={() => { void showPrivacyOptions(); }} className={`col-span-2 rounded-xl px-1.5 py-1.5 text-center text-[10px] font-black transition ${darkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>⚙️ {t('privacyOptions')}</button>
                   <button
                     onClick={() => openOver(() => setShowErrLog(true))}
