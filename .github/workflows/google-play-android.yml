@@ -274,6 +274,13 @@ jobs:
           print("✅ سقف الصياغة آمن لـ WebView القديم")
           PY
 
+      # 🔒 قواعد Android Auto Backup — تستبعد مجلد النسخ والمقاطع الصوتية
+      # من الرفع إلى Google Drive. بدونها يرفع النظام لقطة JSON كاملة من
+      # بيانات المستخدم المالية مع كل نسخة سحابية، لأن قالب Capacitor
+      # يضع allowBackup="true" بلا أي قواعد.
+      - name: Apply Android Auto Backup rules
+        run: bash android-patches/apply-backup-rules.sh
+
       # ✅ متطلبات العتاد — يجب أن يأتي **بعد** كل سكربت يُضيف أذونات،
       # لأن أندرويد يستنتج المتطلبات من الأذونات الموجودة وقت البناء.
       - name: Declare hardware features as optional

@@ -318,6 +318,31 @@ export async function cancelProactiveInsight(): Promise<void> {
 }
 
 /**
+ * يُلغي كل إشعار مجدول، أيّاً كان مصدره.
+ *
+ * لماذا نسأل النظام بدل أن نحسب المعرّفات: المعرّفات مشتقّة من محتوى
+ * المستخدم (hashId على معرّف الملاحظة أو الدين)، فإن حُذف المحتوى أولاً
+ * فقدنا القدرة على استنتاج معرّفاته — ويبقى الإشعار مجدولاً في النظام
+ * ينطلق بعد حذفٍ أعلنَ تمامه، حاملاً عنوان ملاحظةٍ لم تَعُد موجودة.
+ * getPending هو المصدر الوحيد الذي لا يعتمد على بيانات حذفناها.
+ *
+ * يُستدعى من مسار «حذف البيانات» وحده.
+ */
+export async function cancelAllScheduled(): Promise<number> {
+  const LN = (await getPlugin())?.p ?? null;
+  if (!LN) return 0;
+  try {
+    const pending = await LN.getPending();
+    const list = pending?.notifications ?? [];
+    if (list.length === 0) return 0;
+    await LN.cancel({ notifications: list.map((n) => ({ id: n.id })) });
+    return list.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * يستمع للضغط على إشعار. يُعيد دالة إلغاء الاشتراك.
  * الاستماع هنا لا في المكوّنات: التعامل مع الإضافة يجب أن يبقى في هذا
  * الملف وحده، لأن كائن الإضافة Proxy وانتظارُه مباشرةً يُعلّق التنفيذ —

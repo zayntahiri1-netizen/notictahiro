@@ -7,7 +7,8 @@ import LanguageSelector from './LanguageSelector';
 import * as haptics from '../utils/haptics';
 import { showPrivacyOptions, getAdDiagnostics } from '../utils/admob';
 import { getStorageUsage, formatBytes } from '../utils/storageHealth';
-import { getLastBackupTime, isBackupDurable, runAutoBackupIfDue } from '../utils/autoBackup';
+import { getLastBackupTime, isBackupDurable, runAutoBackupIfDue,
+         isPublicBackupEnabled, setPublicBackupEnabled } from '../utils/autoBackup';
 import ErrorLogModal from './ErrorLogModal';
 import VoicePicker from './VoicePicker';
 import RestoreBackupModal from './RestoreBackupModal';
@@ -61,7 +62,10 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
           bubbleAndroidOnly: 'متاحة فقط على أندرويد',
           storage: 'التخزين', errLog: 'سجل الأخطاء',
           backup: 'نسخة احتياطية', backupNever: 'لم تُنشأ بعد', backupTapNow: 'اضغط لإنشاء نسخة الآن',
-          backupDurable: 'محفوظة في المستندات — تبقى بعد حذف التطبيق', backupFragile: 'داخل التطبيق فقط — تُمحى مع حذفه. صدّر نسخة يدوياً' },
+          backupDurable: 'محفوظة في المستندات — تبقى بعد حذف التطبيق', backupFragile: 'داخل التطبيق فقط — تُمحى مع حذفه. صدّر نسخة يدوياً',
+          backupKeep: 'إبقاء النسخة بعد حذف التطبيق',
+          backupKeepOn: 'مُفعَّل: تُكتب في المستندات العامة — قد تقرأها تطبيقات أخرى على جهازك',
+          backupKeepOff: 'مُعطَّل: داخل التطبيق وحده — أكثر خصوصية، وتُمحى مع حذفه' },
     en: { projectsHub: 'The main hub for organizing Notic Tahiro', searchProjects: 'Search projects...',
           notesCount: 'notes', ofContent: 'of content', noMatch: 'No matching projects',
           delProject: 'Delete project', projectName: 'Project name', cancel: 'Cancel', add: 'Add',
@@ -74,7 +78,10 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
           bubbleAndroidOnly: 'Android only',
           storage: 'Storage', errLog: 'Error log',
           backup: 'Backup', backupNever: 'never', backupTapNow: 'Tap to back up now',
-          backupDurable: 'Saved in Documents — survives app deletion', backupFragile: 'Inside the app only — lost on uninstall. Export manually' },
+          backupDurable: 'Saved in Documents — survives app deletion', backupFragile: 'Inside the app only — lost on uninstall. Export manually',
+          backupKeep: 'Keep backup after uninstall',
+          backupKeepOn: 'On: written to public Documents — other apps on your device may read it',
+          backupKeepOff: 'Off: inside the app only — more private, erased when you uninstall' },
     es: { projectsHub: 'El centro principal para organizar Notic Tahiro', searchProjects: 'Buscar proyectos...',
           notesCount: 'notas', ofContent: 'del contenido', noMatch: 'No hay proyectos coincidentes',
           delProject: 'Eliminar proyecto', projectName: 'Nombre del proyecto', cancel: 'Cancelar', add: 'Añadir',
@@ -87,7 +94,10 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
           bubbleAndroidOnly: 'Solo Android',
           storage: 'Almacenamiento', errLog: 'Registro de errores',
           backup: 'Copia de seguridad', backupNever: 'nunca', backupTapNow: 'Toca para crear una ahora',
-          backupDurable: 'En Documentos — sobrevive a la desinstalación', backupFragile: 'Solo dentro de la app — se pierde al desinstalar. Exporta manualmente' },
+          backupDurable: 'En Documentos — sobrevive a la desinstalación', backupFragile: 'Solo dentro de la app — se pierde al desinstalar. Exporta manualmente',
+          backupKeep: 'Conservar la copia tras desinstalar',
+          backupKeepOn: 'Activado: se guarda en Documentos públicos — otras apps podrían leerla',
+          backupKeepOff: 'Desactivado: solo dentro de la app — más privado, se borra al desinstalar' },
     zh: { projectsHub: '整理 Notic Tahiro 的主中心', searchProjects: '搜索项目...',
           notesCount: '条笔记', ofContent: '的内容', noMatch: '没有匹配的项目',
           delProject: '删除项目', projectName: '项目名称', cancel: '取消', add: '添加',
@@ -100,7 +110,10 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
           bubbleAndroidOnly: '仅支持安卓',
           storage: '存储空间', errLog: '错误日志',
           backup: '备份', backupNever: '尚未创建', backupTapNow: '点击立即备份',
-          backupDurable: '保存在「文档」中 —— 卸载应用后仍然保留', backupFragile: '仅在应用内 —— 卸载即丢失。请手动导出' },
+          backupDurable: '保存在「文档」中 —— 卸载应用后仍然保留', backupFragile: '仅在应用内 —— 卸载即丢失。请手动导出',
+          backupKeep: '卸载后保留备份',
+          backupKeepOn: '已开启：写入公共「文档」—— 设备上的其他应用可能读取',
+          backupKeepOff: '已关闭：仅保存在应用内 —— 更私密，卸载时一并删除' },
   }[(language as 'ar'|'en'|'es'|'zh')] ?? {
     projectsHub: 'The main hub for organizing Notic Tahiro', searchProjects: 'Search projects...',
     notesCount: 'notes', ofContent: 'of content', noMatch: 'No matching projects',
@@ -127,6 +140,8 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
   // مرئياً دائماً فيُصبح الامتلاء مفاجأة مستحيلة لا كارثة صامتة.
   const [storage, setStorage] = useState(() => getStorageUsage());
   const [backupAt, setBackupAt] = useState<Date | null>(() => getLastBackupTime());
+  // موافقة الكتابة في المستندات العامة — حالة محلية كي تُحدَّث الواجهة فوراً
+  const [keepPublic, setKeepPublic] = useState<boolean>(() => isPublicBackupEnabled());
   const [backupBusy, setBackupBusy] = useState(false);
   const [showErrLog, setShowErrLog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -663,6 +678,33 @@ export default function Sidebar({ onNewNote, onNewIdea }: SidebarProps) {
                         : isBackupDurable()
                         ? (SB.backupDurable ?? 'محفوظة في المستندات — تبقى بعد حذف التطبيق')
                         : (SB.backupFragile ?? 'داخل التطبيق فقط — تُمحى مع حذفه. صدّر نسخة يدوياً')}
+                    </div>
+                  </button>
+
+                  {/* موافقة صريحة على كتابة النسخة في المستندات العامة.
+                      كان هذا يحدث افتراضياً وبلا علم المستخدم — وهو تخزين
+                      مشترك تقرأه تطبيقات أخرى، والمحتوى ملاحظات وديون
+                      ومعاملات مالية. فصار قراراً يملكه هو. */}
+                  <button
+                    onClick={() => {
+                      const next = !keepPublic;
+                      setPublicBackupEnabled(next);
+                      setKeepPublic(next);
+                      haptics.tap('light');
+                    }}
+                    className={`mt-1.5 w-full rounded-xl px-2 py-1.5 text-start transition ${
+                      darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {keepPublic ? '☑️' : '⬜'} {SB.backupKeep ?? 'إبقاء النسخة بعد حذف التطبيق'}
+                    </span>
+                    <div className={`mt-0.5 text-[9px] leading-tight ${
+                      keepPublic ? 'text-amber-500' : darkMode ? 'text-gray-500' : 'text-gray-400'
+                    }`}>
+                      {keepPublic
+                        ? (SB.backupKeepOn ?? 'مُفعَّل: تُكتب في المستندات العامة — قد تقرأها تطبيقات أخرى على جهازك')
+                        : (SB.backupKeepOff ?? 'مُعطَّل: داخل التطبيق وحده — أكثر خصوصية، وتُمحى مع حذفه')}
                     </div>
                   </button>
 

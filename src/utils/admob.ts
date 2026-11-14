@@ -111,6 +111,23 @@ async function storageSet(key: string, value: string): Promise<void> {
   try { localStorage.setItem(key, value); } catch { /* بيئة بدون storage */ }
 }
 
+// ─── ذاكرة قرار الموافقة ─────────────────────────────────────────────
+// وثائق Google: «إن حدث خطأ أثناء جمع الموافقة، تحقّق مما إذا كان
+// بإمكانك طلب الإعلانات» — ومكتبة UMP نفسها تستعمل حالة الموافقة من
+// الجلسة السابقة. فنحفظ آخر قرار موثَّق لنرجع إليه عند الخطأ أو المهلة،
+// بدل افتراض الموافقة.
+const CONSENT_KEY = 'notic_consent_can_request';
+
+async function rememberConsent(ok: boolean): Promise<void> {
+  await storageSet(CONSENT_KEY, ok ? '1' : '0');
+}
+
+/** آخر قرار موافقة موثَّق — أو null إن لم تُحصَّل موافقة في أي جلسة. */
+async function recallConsent(): Promise<boolean | null> {
+  const v = await storageGet(CONSENT_KEY);
+  return v === '1' ? true : v === '0' ? false : null;
+}
+
 // ─── الوصول إلى الإضافة (مستوردة استيراداً ثابتاً — بلا طلب شبكي) ────
 let _lastError = ''; // آخر خطأ — يظهر في شاشة التشخيص داخل التطبيق
 /**
@@ -138,34 +155,55 @@ function getAdMob(): typeof AdMobPlugin | null {
 }
 
 // ─── موافقة UMP / GDPR ───────────────────────────────────────────────
-// التسلسل الرسمي المعتمد من Google (EU User Consent Policy):
-//   1. AdMob.initialize  2. requestConsentInfo  3. showConsentForm (إن لزم)
-//   4. عندها فقط نُحمّل الإعلانات.
-// هذا يضمن أن مستخدمي الاتحاد الأوروبي/UK يرون نموذج الموافقة قبل أي إعلان،
-// بينما يتجاهله مستخدمو المغرب وباقي الدول تلقائياً (Google يحدّد ذلك جغرافياً).
+// ⚠️ تصحيح ادّعاء كان مكتوباً هنا: Google **لا تفرض** ترتيباً بين
+// AdMob.initialize وطلب الموافقة. ما تفرضه وثائق UMP شيءٌ آخر: ألّا
+// يُطلب إعلانٌ قبل أن يكون canRequestAds صحيحاً، وأن يُرجَع عند الخطأ
+// إلى حالة الموافقة المحفوظة — لا أن تُفترض الموافقة.
+//
+// وهذا ما كان مكسوراً فعلاً: كانت الدالة تُرجع true عند أي خطأ، والمهلة
+// تضبط _canRequestAds=true. أي أن تعذُّر الوصول إلى خدمة الموافقة كان
+// يُنتج السلوك نفسه الذي تُنتجه موافقةٌ صريحة — ومستخدم أوروبي على شبكة
+// بطيئة كان يرى إعلانات مخصّصة بلا أن يُسأل.
+//
+// الآن: نجاحٌ ⇒ نحفظ القرار. خطأ أو مهلة ⇒ نستعمل آخر قرار محفوظ، وإن
+// لم يوجد (أول تشغيل) ⇒ لا إعلانات في هذه الجلسة، ويُعاد المحاولة لاحقاً.
 async function requestConsent(): Promise<boolean> {
   const AdMob = getAdMob();
-  if (!AdMob) return true; // لا مكتبة (ويب) → نسمح بالمتابعة
+  // بيئة ويب: لا إضافة أصلية ⇒ لا إعلان أصلي يُطلب، فلا موافقة تُجمع هنا.
+  if (!AdMob) return true;
   const api = AdMob as unknown as {
     requestConsentInfo?: (o?: unknown) => Promise<{ status?: string; isConsentFormAvailable?: boolean; canRequestAds?: boolean }>;
     showConsentForm?: () => Promise<{ canRequestAds?: boolean }>;
   };
-  if (typeof api.requestConsentInfo !== 'function') return true;
+  if (typeof api.requestConsentInfo !== 'function') {
+    // فرعٌ لا يُفترض الوصول إليه: الإضافة المثبَّتة توفّر UMP. فإن وصلناه
+    // فالإضافة بلا UMP ولا سبيل لجمع موافقة — نُبقي الإعلانات عاملة كي لا
+    // ينكسر الدخل بصمت، لكن نُسجّلها في التشخيص لتكون مرئية لا مخفية.
+    _lastError = '⚠️ الإضافة المثبَّتة لا توفّر UMP — لا يمكن جمع الموافقة';
+    console.warn('[AdMob] UMP API غير متوفّر في هذه الإضافة');
+    return true;
+  }
   try {
     const info = await api.requestConsentInfo({ tagForUnderAgeOfConsent: false });
     // إن كان النموذج مطلوباً ومتاحاً → اعرضه وانتظر قرار المستخدم
     if (info?.isConsentFormAvailable && info?.status === 'REQUIRED' && typeof api.showConsentForm === 'function') {
       const result = await api.showConsentForm();
       // بعد عرض النموذج، canRequestAds يعكس قرار المستخدم
-      return result?.canRequestAds !== false;
+      const ok = result?.canRequestAds !== false;
+      await rememberConsent(ok);
+      return ok;
     }
     // لا نموذج مطلوب (خارج الاتحاد الأوروبي مثل المغرب) → يُسمح بالإعلانات
-    return info?.canRequestAds !== false;
+    const ok = info?.canRequestAds !== false;
+    await rememberConsent(ok);
+    return ok;
   } catch (e) {
-    _lastError = 'خطأ في نموذج الموافقة: ' + String(e);
+    const prior = await recallConsent();
+    _lastError = 'خطأ في نموذج الموافقة: ' + String(e)
+      + (prior === null ? ' — لا قرار محفوظ ⇒ لا إعلانات' : ` — نرجع إلى القرار المحفوظ (${prior ? 'مسموح' : 'ممنوع'})`);
     console.warn('[AdMob] consent:', e);
     logError('admob', e);
-    return true; // عند الخطأ لا نمنع الإعلانات (سلوك آمن غير معطّل)
+    return prior ?? false;
   }
 }
 
@@ -238,7 +276,11 @@ export function getAdDiagnostics() {
 }
 
 let _initPromise: Promise<void> | null = null;
-let _canRequestAds = true; // بوابة GDPR: هل يُسمح بطلب الإعلانات بعد الموافقة؟
+// بوابة GDPR: هل يُسمح بطلب الإعلانات؟
+// ⚠️ الابتداء بـfalse مقصود: لو انهارت التهيئة قبل الوصول إلى خطوة
+// الموافقة، كانت القيمة تبقى true فتُعرض إعلانات بلا أن تُسأل الموافقة
+// قطّ. الآن البوابة مغلقة حتى يُفتحها قرارٌ فعلي.
+let _canRequestAds = false;
 /**
  * سباق مع مهلة زمنية. سبب وجودها: MobileAds.initialize() على أندرويد قد
  * لا يستدعي دالة الرجوع (callback) أبداً في بعض الأجهزة/الشبكات — فيبقى
@@ -359,8 +401,11 @@ export function initAdMob(): Promise<void> {
       trace('✓ الموافقة انتهت');
       if (consentRes === '__TIMEOUT__') {
         _consentTimedOut = true;
-        _canRequestAds = true; // لا نمنع الإعلانات بسبب بطء الشبكة
-        console.warn('[AdMob] نموذج الموافقة تجاوز 8 ثوانٍ — نتابع');
+        // المهلة ليست موافقة. نرجع إلى آخر قرار موثَّق، وإن لم يوجد
+        // فلا إعلانات في هذه الجلسة — يُعاد طلب الموافقة عند التشغيل القادم.
+        const prior = await recallConsent();
+        _canRequestAds = prior ?? false;
+        console.warn('[AdMob] نموذج الموافقة تجاوز 8 ثوانٍ — القرار المحفوظ:', prior);
       } else {
         _canRequestAds = consentRes;
       }

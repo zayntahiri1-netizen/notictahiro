@@ -8,18 +8,34 @@
  * ما يفعله: لقطة JSON كاملة مرة كل 24 ساعة، تُكتب كملف، مع الاحتفاظ
  * بآخر 3 نسخ (نقطة تراجع إن أفسد خللٌ ما بيانات اليوم).
  *
- * أين تُكتب — وهذا هو بيت القصيد:
- *   Directory.Documents = مجلد المستندات العام. **يبقى بعد حذف التطبيق.**
- *   Directory.Data      = داخل التطبيق. يُمحى معه.
- * نحاول العام أولاً ونتراجع للداخلي عند الرفض، ونُبلّغ الواجهة أيّ
- * مستوى تحقّق فعلاً (isBackupDurable) بدل ادّعاء أمانٍ لا وجود له.
+ * أين تُكتب — وهذا هو بيت القصيد، وفيه تعارضٌ حقيقي لا حلّ واحد له:
+ *   Directory.Data      = داخل التطبيق. يُمحى مع حذفه. لا يقرأه غيره.
+ *   Directory.Documents = مجلد المستندات العام. يبقى بعد حذف التطبيق،
+ *                         **وتستطيع تطبيقات أخرى على الجهاز قراءته.**
  *
- * الاسترجاع في backupRestore.ts — بلا قراءة، كانت هذه الميزة نصفَ ميزة.
+ * ⚠️ كانت النسخة تُكتب في المجلد العام افتراضياً وبلا علم المستخدم. وهذا
+ * يعني أن ملف JSON غير مشفَّر فيه ملاحظاته وديونه ومعاملاته المالية
+ * وميزانيته كان يُكتب تلقائياً في تخزين مشترك كل 24 ساعة، ويبقى هناك
+ * بعد حذف التطبيق، ولا يمسحه زرّ «حذف البيانات». ثلاثُ مشكلات في آن:
+ * كشفُ بياناتٍ ماليةٍ لتطبيقات أخرى، ومعالجةٌ بلا موافقة، ووعدُ حذفٍ
+ * لا يتحقّق. وسياسات Google تشترط إفصاحاً صريحاً وموافقةً قبل كتابة
+ * بيانات شخصية في تخزين مشترك.
  *
- * ⚠️ تصحيح ادّعاء كان مكتوباً هنا: لا شيء في هذا المشروع يُهيّئ
- * Android Auto Backup. سلوكه يعتمد على افتراضات أندرويد وعلى تفعيل
- * المستخدم لنسخ Google Drive — فلا نَعِد به. الضمان الحقيقي الذي نملكه
- * هو ملف المستندات أعلاه، ثم مزامنة سحابية بحساب (غير مبنية بعد).
+ * القرار: الافتراض الآن **Directory.Data** — لا إفصاح يلزم، ولا كشف،
+ * ويُمحى مع التطبيق. ومن أراد نسخةً تنجو من حذف التطبيق يُفعّل المفتاح
+ * بنفسه (isPublicBackupEnabled) بعد أن يقرأ معنى ذلك في الواجهة.
+ *
+ * ولمَ لا نُشفّر بدل ذلك؟ لأن التشفير هنا يحلّ المشكلة الخطأ: في المخزن
+ * الخاص لا داعي له (حدود التطبيق تكفي)، وفي المخزن العام يحتاج مفتاحاً،
+ * ومفتاحٌ محفوظ في localStorage يموت مع حذف التطبيق فتصير النسخة
+ * «الناجية» ملفاً لا يُقرأ — أي نقضُ الغرض الذي وُجدت له.
+ *
+ * الاسترجاع في backupRestore.ts، وهو يقرأ من المجلدين كليهما — فالنسخ
+ * القديمة في المستندات تظل قابلة للاسترجاع بعد هذا التغيير.
+ *
+ * وAndroid Auto Backup: يُستبعد مجلد النسخ والصوتيات منه عبر
+ * android-patches/apply-backup-rules.sh، وإلا رفعت Google Drive ما
+ * حرصنا على إبقائه داخل الجهاز.
  */
 import { Capacitor } from '@capacitor/core';
 
@@ -109,10 +125,57 @@ async function rotate(
  * `force` يتجاوز الفاصل الزمني (لزرّ "انسخ الآن").
  */
 const DURABLE_KEY = 'notic-backup-durable';
+/**
+ * مفتاح الموافقة على الكتابة في المستندات العامة.
+ * الافتراض **إيقاف**: الغياب يعني «لا»، فمستخدمو النسخ السابقة لا
+ * يُورَّثون موافقةً لم يمنحوها.
+ */
+const PUBLIC_KEY = 'notic-backup-public';
 
 /** هل آخر نسخة كُتبت في مكان ينجو من حذف التطبيق؟ */
 export function isBackupDurable(): boolean {
   try { return localStorage.getItem(DURABLE_KEY) === '1'; } catch { return false; }
+}
+
+/** هل وافق المستخدم على كتابة النسخ في المستندات العامة؟ (افتراضاً: لا) */
+export function isPublicBackupEnabled(): boolean {
+  try { return localStorage.getItem(PUBLIC_KEY) === '1'; } catch { return false; }
+}
+
+/** يضبط الموافقة. يُستدعى من مفتاح الواجهة وحده — لا تلقائياً. */
+export function setPublicBackupEnabled(on: boolean): void {
+  try { localStorage.setItem(PUBLIC_KEY, on ? '1' : '0'); } catch { /* غير حرج */ }
+}
+
+/**
+ * يحذف كل ملفات النسخ من **المجلدين** — الخاص والعام.
+ * يُستدعى من مسار «حذف البيانات»: كان الزرّ يمسح localStorage وحده،
+ * فتبقى النسخ (وفيها البيانات نفسها) على الجهاز بعد حذفٍ أعلنَ تمامه.
+ * ويشمل المجلد العام كي تُنظَّف نسخُ الإصدارات السابقة أيضاً.
+ */
+export async function purgeAllBackups(): Promise<number> {
+  if (!Capacitor.isNativePlatform()) return 0;
+  let removed = 0;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    for (const directory of [Directory.Data, Directory.Documents]) {
+      try {
+        const { files } = await Filesystem.readdir({ path: DIR, directory });
+        for (const f of files) {
+          const name = typeof f === 'string' ? f : f.name;
+          if (!name.startsWith(BACKUP_PREFIX)) continue;
+          await Filesystem.deleteFile({ path: `${DIR}/${name}`, directory })
+            .then(() => { removed += 1; })
+            .catch(() => { /* محذوف مسبقاً أو ممنوع — لا نُسقط الباقي */ });
+        }
+      } catch { /* لا مجلد في هذا الموضع — طبيعي */ }
+    }
+  } catch { /* الإضافة غير متاحة */ }
+  try {
+    localStorage.removeItem(LAST_BACKUP_KEY);
+    localStorage.removeItem(DURABLE_KEY);
+  } catch { /* غير حرج */ }
+  return removed;
 }
 
 export async function runAutoBackupIfDue(force = false): Promise<BackupResult> {
@@ -133,28 +196,34 @@ export async function runAutoBackupIfDue(force = false): Promise<BackupResult> {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const path = `${DIR}/${BACKUP_PREFIX}${stamp}.json`;
 
-    // ⚠️ الوجهة هي جوهر الميزة كلها:
-    //   Directory.Data        = مجلد التطبيق الداخلي — يُمحى مع حذف التطبيق.
-    //                           أي أن النسخة تموت بنفس الكارثة التي وُجدت لتمنعها.
-    //   Directory.Documents   = مجلد المستندات العام — يبقى بعد حذف التطبيق.
-    // نحاول العام أولاً. قد يرفضه أندرويد 11+ (Scoped Storage)، فنتراجع
-    // للداخلي: حمايةٌ أقل (من تلف البيانات لا من الحذف) خيرٌ من لا شيء —
-    // ونُبلّغ الواجهة أيّ مستوى تحقّق فعلاً بدل ادّعاء أمان لا وجود له.
-    let dir: Directory = Directory.Documents;
-    let survivesUninstall = true;
-
+    // ⚠️ الوجهة تتبع موافقة المستخدم، لا الأفضلية التقنية:
+    //   مُوافِق     → المستندات العامة (تنجو من حذف التطبيق)، وعند رفض
+    //                 أندرويد 11+ لها (Scoped Storage) نتراجع للمخزن الخاص.
+    //   غير مُوافِق → المخزن الخاص وحده. لا محاولة للعام إطلاقاً.
+    // وisBackupDurable يُبلّغ الواجهة بما تحقّق فعلاً لا بما كان مطلوباً.
     const write = async (d: Directory) => {
       await Filesystem.mkdir({ path: DIR, directory: d, recursive: true })
         .catch(() => { /* موجود مسبقاً */ });
       await Filesystem.writeFile({ path, data: content, directory: d, encoding: Encoding.UTF8 });
     };
 
-    try {
-      await write(Directory.Documents);
-    } catch {
+    let dir: Directory;
+    let survivesUninstall: boolean;
+
+    if (isPublicBackupEnabled()) {
+      dir = Directory.Documents;
+      survivesUninstall = true;
+      try {
+        await write(Directory.Documents);
+      } catch {
+        dir = Directory.Data;
+        survivesUninstall = false;
+        await write(Directory.Data); // لو فشل هذا أيضاً، يلتقطه catch الخارجي
+      }
+    } else {
       dir = Directory.Data;
       survivesUninstall = false;
-      await write(Directory.Data); // لو فشل هذا أيضاً، يلتقطه catch الخارجي
+      await write(Directory.Data);
     }
 
     try { localStorage.setItem(DURABLE_KEY, survivesUninstall ? '1' : '0'); } catch { /* غير حرج */ }
